@@ -155,31 +155,12 @@ body.level-s #boardShell{
 }
 #tools button:active,#pieceTools button:active{transform:scale(.94)}
 #tools .hot{background:linear-gradient(135deg,#ff6978,#ef4662);color:#fff}
-#tools .edit{background:linear-gradient(135deg,#c395ff,#8d5cf6);color:#fff}
 #tools .sound{background:linear-gradient(135deg,#63ddff,#45bff0);color:#111832}
 #tools .sound.off{background:linear-gradient(135deg,#77708f,#4d4668);color:#d7d0f0}
 #msg{
   min-height:22px;text-align:center;font-weight:900;color:#c9bdff;font-size:.72rem;
   padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.07);
 }
-#editor{
-  display:none;width:min(96vw,360px);padding:9px;border-radius:14px;
-  background:rgba(24,15,58,.9);border:2px solid rgba(139,216,255,.36);
-  box-shadow:0 14px 36px rgba(0,0,0,.22);position:relative;z-index:60;
-}
-#editor.show{display:block}
-#editorTop{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#efe8ff;font-size:.76rem;font-weight:900;margin-bottom:7px}
-#shapeGrid{display:grid;grid-template-columns:repeat(5,26px);grid-auto-rows:26px;gap:4px;justify-content:center}
-.shapeCell{border-radius:7px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08)}
-.shapeCell.on{background:var(--editColor,#ffd36a);border-color:rgba(255,255,255,.78);box-shadow:inset 0 5px 8px rgba(255,255,255,.24)}
-#editorBtns{display:flex;justify-content:center;gap:7px;margin-top:8px}
-#editorBtns button{min-height:30px;padding:0 10px;border-radius:999px;background:#ffe76f;color:#181026;font-size:.72rem}
-#exportText{
-  display:none;width:100%;height:86px;margin-top:8px;padding:7px;border-radius:9px;
-  border:1px solid rgba(255,255,255,.35);background:rgba(9,5,28,.78);color:#f5edff;
-  font:600 .68rem ui-monospace,SFMono-Regular,Menlo,monospace;resize:none;
-}
-#exportText.show{display:block}
 #tray{
   width:100%;height:42px;position:relative;border-radius:999px;padding:0;
   background:transparent;border:0;
@@ -381,22 +362,8 @@ body.level-s #boardShell{
       <button class="hot" id="newBtn">今日重排</button>
       <button id="hintBtn">提示一块</button>
       <button class="sound" id="soundBtn">音乐开</button>
-      <button class="edit" id="editBtn">编辑模式</button>
     </div>
     <div id="msg">选中小块后可旋转或翻面，拖到日历格上会自动吸附。</div>
-    <div id="editor">
-      <div id="editorTop"><span id="editorTitle">选择一个碎块</span><span>点格子改形状</span></div>
-      <div id="shapeGrid"></div>
-      <div id="editorBtns">
-        <button id="addPieceBtn">增加小块</button>
-        <button id="saveDraftBtn">暂存调整</button>
-        <button id="saveABtn">保存为黄金</button>
-        <button id="saveBBtn">保存为白银</button>
-        <button id="exportDraftBtn">导出配置</button>
-        <button id="clearDraftBtn">清除暂存</button>
-      </div>
-      <textarea id="exportText" readonly></textarea>
-    </div>
   </section>
   <aside id="right">
     <div id="tray">
@@ -720,41 +687,6 @@ function saveDraft(){
   msg("已暂存。调完告诉我“保存”，我会写回文件。");
   return draft;
 }
-function exportDraft(){
-  const draft=saveDraft();
-  const text=JSON.stringify(draft);
-  const box=document.getElementById("exportText");
-  box.value=text;
-  box.classList.add("show");
-  box.focus();
-  box.select();
-  try{
-    navigator.clipboard?.writeText(text);
-    msg("配置已导出并尝试复制。把文本框内容发我，我来保存成 A 卡。");
-  }catch(e){
-    msg("配置已导出。把文本框内容发我，我来保存成 A 卡。");
-  }
-}
-async function saveAsCard(level){
-  const draft=saveDraft();
-  const payload={level,draft};
-  try{
-    const res=await fetch("http://127.0.0.1:8734/save-card",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(payload)
-    });
-    if(!res.ok)throw new Error("HTTP "+res.status);
-    playSfx("save");
-    msg(`打卡${level}已发送保存。`);
-  }catch(e){
-    const box=document.getElementById("exportText");
-    box.value=JSON.stringify(payload);
-    box.classList.add("show");
-    playSfx("bad");
-    msg(`没有连上保存服务。已导出打卡${level}配置。`);
-  }
-}
 function carveFallback(){
   const sizes=[5,5,5,5,5,5,5,5,4,3],open=[...validKeys].filter(k=>!state.target.has(k));
   const openSet=new Set(open),chunks=[];
@@ -797,7 +729,6 @@ function makePieces(){
   }));
   layoutTrayPieces();
   drawPieces();
-  renderShapeEditor();
 }
 function layoutTrayPieces(){
   const board=document.getElementById("boardShell").getBoundingClientRect();
@@ -882,7 +813,6 @@ function boardOrigin(){
 function markSelected(id){
   state.selected=id;
   [...document.querySelectorAll(".piece")].forEach(el=>el.classList.toggle("selected",el.dataset.id===id));
-  renderShapeEditor();
 }
 function pieceAt(id){return state.pieces.find(p=>p.id===id);}
 function shapeAbs(p,r=p.boardR,c=p.boardC){
@@ -967,7 +897,7 @@ function transformSelected(kind){
   if(kind==="flip")p.flip=!p.flip;
   if(state.editing){
     p.homeRot=p.rot;p.homeFlip=p.flip;
-    saveDraft();playSfx(kind==="flip"?"flip":"rotate");drawPieces();renderShapeEditor();return;
+    saveDraft();playSfx(kind==="flip"?"flip":"rotate");drawPieces();return;
   }
   if(wasPlaced){
     if(placePiece(p,old.r,old.c)){playSfx(kind==="flip"?"flip":"rotate");msg(kind==="flip"?"已在盘面上翻转。":"已在盘面上旋转。");}
@@ -996,77 +926,13 @@ function startLevel(card,announce=false){
   state.levelStart=Date.now();
   stampEl.textContent="";
   winEl.className="";
-  document.getElementById("editor").classList.remove("show");
-  document.getElementById("editBtn").textContent="编辑模式";
   updateLevelUI();
   makePieces();refreshCovered();
   if(announce)playSfx("card");
   msg(`${LEVEL_META[card].label}开始，完成后继续下一卡。`);
 }
-function toggleEdit(){
-  state.editing=!state.editing;
-  document.getElementById("editor").classList.toggle("show",state.editing);
-  document.getElementById("editBtn").textContent=state.editing?"退出编辑":"编辑模式";
-  playSfx("card");
-  if(state.editing){
-    resetAll();
-    msg("编辑模式：拖碎块改初始位置，点下方格子改形状。");
-  }else{
-    saveDraft();
-    makePieces();
-    msg("已退出编辑并暂存。");
-  }
-}
 function setCard(card){
   startLevel(card,true);
-}
-function renderShapeEditor(){
-  const grid=document.getElementById("shapeGrid");
-  const title=document.getElementById("editorTitle");
-  if(!grid||!title)return;
-  grid.innerHTML="";
-  const p=pieceAt(state.selected);
-  if(!p){
-    title.textContent="选择一个碎块";
-    for(let i=0;i<25;i++)grid.appendChild(document.createElement("div")).className="shapeCell";
-    return;
-  }
-  title.textContent=`${p.id} · ${p.name}`;
-  grid.style.setProperty("--editColor",p.color);
-  const cells=new Set(normalize(p.cells).map(c=>c.join(",")));
-  for(let y=0;y<5;y++)for(let x=0;x<5;x++){
-    const cell=document.createElement("button");
-    cell.className="shapeCell"+(cells.has(`${x},${y}`)?" on":"");
-    cell.type="button";
-    cell.onclick=()=>{
-      const next=new Set(normalize(p.cells).map(c=>c.join(",")));
-      const key=`${x},${y}`;
-      if(next.has(key)&&next.size>1)next.delete(key); else next.add(key);
-      p.cells=normalize([...next].map(k=>k.split(",").map(Number)));
-      p.placed=false;p.lifted=false;
-      saveDraft();playSfx("shape");drawPieces();renderShapeEditor();
-    };
-    grid.appendChild(cell);
-  }
-}
-function addPiece(){
-  if(!state.editing)toggleEdit();
-  const board=document.getElementById("boardShell").getBoundingClientRect();
-  const id=nextPieceId();
-  const p={
-    id,name:`新增小块${id}`,cells:[[0,0]],color:nextColor(state.pieces.length),
-    rot:0,homeRot:0,flip:false,homeFlip:false,manualHome:{dx:Math.round(board.width/2),dy:Math.round(board.height+36),step:Math.round(cellStep()*1000)/1000},
-    x:board.left+Math.round(board.width/2),y:board.top+Math.round(board.height+36),homeX:0,homeY:0,lifted:false,
-    placed:false,boardR:null,boardC:null,solution:null
-  };
-  state.pieces.push(p);
-  markSelected(id);
-  layoutTrayPieces();
-  saveDraft();
-  playSfx("add");
-  drawPieces();
-  renderShapeEditor();
-  msg("已增加小块。用网格改形状，拖动改初始位置。");
 }
 function hintOne(){
   const next=state.pieces.find(p=>!p.placed);if(!next){playSfx("bad");return;}
@@ -1142,13 +1008,6 @@ document.getElementById("flipBtn").onclick=()=>transformSelected("flip");
 document.getElementById("newBtn").onclick=()=>{startLevel(state.card,true);msg(`${LEVEL_META[state.card].label}已重新开始。`);};
 document.getElementById("hintBtn").onclick=hintOne;
 document.getElementById("soundBtn").onclick=toggleSound;
-document.getElementById("editBtn").onclick=toggleEdit;
-document.getElementById("addPieceBtn").onclick=addPiece;
-document.getElementById("saveDraftBtn").onclick=()=>{saveDraft();playSfx("save");};
-document.getElementById("saveABtn").onclick=()=>saveAsCard("A");
-document.getElementById("saveBBtn").onclick=()=>saveAsCard("B");
-document.getElementById("exportDraftBtn").onclick=()=>{exportDraft();playSfx("save");};
-document.getElementById("clearDraftBtn").onclick=()=>{localStorage.removeItem(`${STORAGE_KEY}_${state.card}`);state.draft=null;makePieces();playSfx("reset");msg("已清除暂存。");};
 document.getElementById("closeWin").onclick=continueAfterWin;
 document.addEventListener("pointerdown",primeAudio,{passive:true});
 document.addEventListener("keydown",primeAudio);
