@@ -346,7 +346,9 @@ const NUMBER_PUZZLE_MUSIC = 'https://cdn1.suno.ai/95b417d9-14e4-4960-841a-72a8db
 const TANGSHI_MUSIC = 'https://cdn1.suno.ai/ccb5d5f3-7d95-4f7d-a96b-ba8a0b7a044f.mp3';
 const FOLD_COLOR_MUSIC = 'https://cdn1.suno.ai/2e6b75d5-9314-4747-9ee7-4df64510ffc9.mp3';
 const REAL_AVATAR_MODEL = './assets/avatar-animated.glb';
-const WISDOM_TREE_MODEL = './assets/wisdom-tree/island_tree_02_1k.gltf';
+const WISDOM_TREE_MODEL = './assets/wisdom-tree/island_tree_mobile.glb';
+const WISDOM_TREE_MOBILE_MODEL = './assets/wisdom-tree/island_tree_mobile.glb';
+const LOW_POWER_DEVICE = innerWidth <= 900 || matchMedia('(pointer: coarse)').matches || (navigator.deviceMemory && navigator.deviceMemory <= 4) || navigator.connection?.saveData;
 const AVATAR_MOVE_SPEED = 5.4;
 const AVATAR_ACTIONS = {
   idle:{label:'待机', duration:0},
@@ -958,6 +960,83 @@ function createAbilityMonument(ability, color){
   return {group, core: core || plinth};
 }
 
+function createSolemnFallbackTree(parent){
+  const fallback = new THREE.Group();
+  fallback.userData.kind = 'fallbackTree';
+  parent.add(fallback);
+
+  const barkMat = makeMat(0x5b432f,.74,.08,.04);
+  const darkBarkMat = makeMat(0x2f241d,.82,.06,.02);
+  const leafMats = [
+    makeMat(0x233f32,.64,.02,.04),
+    makeMat(0x3d6545,.58,.02,.06),
+    makeMat(0x617647,.6,.02,.05)
+  ];
+  const glowMat = makeGlowMat(0xb8ffd9,.22);
+
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.42,.82,5.8,18), barkMat);
+  trunk.position.y = 3.02;
+  trunk.rotation.z = -.045;
+  trunk.castShadow = true;
+  trunk.receiveShadow = true;
+  fallback.add(trunk);
+
+  for(let i=0;i<8;i++){
+    const angle = i / 8 * Math.PI * 2;
+    addTube(fallback, [Math.cos(angle)*.34,.62,Math.sin(angle)*.34], [Math.cos(angle)*2.35,.35,Math.sin(angle)*2.35], .05, darkBarkMat);
+  }
+
+  const branchData = [
+    [[0,3.72,0],[-1.9,5.2,-.72],.17],
+    [[0,3.94,0],[2.05,5.35,-.64],.16],
+    [[0,4.18,0],[-.82,5.9,1.55],.13],
+    [[0,4.32,0],[1.08,6.08,1.2],.13],
+    [[0,4.06,0],[.42,5.18,-2.05],.14],
+    [[0,4.58,0],[-1.68,6.2,.62],.11],
+    [[0,4.68,0],[1.72,6.35,.52],.1]
+  ];
+  branchData.forEach(([from,to,r], i)=>{
+    addTube(fallback, from, to, r, barkMat);
+    if(i < 5) addTube(fallback, from, to, r*.18, glowMat);
+  });
+
+  const crownGeo = new THREE.DodecahedronGeometry(1,0);
+  const crowns = [
+    {p:[0,6.55,0],s:[2.25,1.2,1.82]},
+    {p:[-1.42,6.08,-.32],s:[1.45,.86,1.2]},
+    {p:[1.55,6.18,-.42],s:[1.52,.92,1.25]},
+    {p:[-.55,6.95,.78],s:[1.22,.78,1.05]},
+    {p:[.82,7.08,.48],s:[1.12,.72,.96]},
+    {p:[.16,7.38,-.2],s:[.92,.62,.82]}
+  ];
+  crowns.forEach((item,i)=>{
+    const crown = new THREE.Mesh(crownGeo, leafMats[i % leafMats.length]);
+    crown.position.set(...item.p);
+    crown.scale.set(...item.s);
+    crown.rotation.set(i*.32,i*.41,i*.18);
+    crown.castShadow = true;
+    crown.receiveShadow = true;
+    crown.userData.kind = 'fallbackCrown';
+    crown.userData.floatBaseY = crown.position.y;
+    crown.userData.floatAmp = .028 + i*.004;
+    wisdomTreeParts.push(crown);
+    fallback.add(crown);
+  });
+
+  ABILITIES.forEach((ability,i)=>{
+    const angle = i / ABILITIES.length * Math.PI * 2 - Math.PI/2;
+    const fruit = new THREE.Mesh(new THREE.IcosahedronGeometry(.12,1), makeGlowMat(ability.color,.34));
+    fruit.position.set(Math.cos(angle)*1.8, 6.68 + (i%2)*.36, Math.sin(angle)*1.36);
+    fruit.userData.kind = 'spark';
+    fruit.userData.floatBaseY = fruit.position.y;
+    fruit.userData.floatAmp = .05;
+    wisdomTreeParts.push(fruit);
+    fallback.add(fruit);
+  });
+
+  return fallback;
+}
+
 function buildWisdomTree(){
   const tree = new THREE.Group();
   tree.position.set(0,.28,0);
@@ -1017,8 +1096,17 @@ function buildWisdomTree(){
   wisdomTreeParts.push(halo);
   tree.add(halo);
 
+  const fallbackTree = createSolemnFallbackTree(tree);
+  let realTreeLoaded = false;
+  const showFallbackTimer = setTimeout(() => {
+    if(!realTreeLoaded) fallbackTree.visible = true;
+  }, 8000);
+
+  const treeModelUrl = LOW_POWER_DEVICE ? WISDOM_TREE_MOBILE_MODEL : WISDOM_TREE_MODEL;
   const loader = new GLTFLoader();
-  loader.load(WISDOM_TREE_MODEL, gltf => {
+  loader.load(treeModelUrl, gltf => {
+    realTreeLoaded = true;
+    clearTimeout(showFallbackTimer);
     const source = gltf.scene;
     const chosen = source.getObjectByName('island_tree_02_LOD0')
       || source.children.find(child => child.isObject3D)
@@ -1049,6 +1137,7 @@ function buildWisdomTree(){
     realTree.rotation.y = -.3;
     realTree.userData.kind = 'realTree';
     tree.add(realTree);
+    fallbackTree.visible = false;
 
     ABILITIES.forEach((ability,i)=>{
       const angle = i / ABILITIES.length * Math.PI * 2 - Math.PI/2;
@@ -1062,6 +1151,8 @@ function buildWisdomTree(){
     });
   }, undefined, err => {
     console.warn('Wisdom tree model failed to load', err);
+    clearTimeout(showFallbackTimer);
+    fallbackTree.visible = true;
   });
 
   const treeLight = new THREE.PointLight(0xa9ffd6,18,22,1.55);
@@ -1394,7 +1485,7 @@ function createGameMotif(game, col){
 function buildAvatar(){
   const group = new THREE.Group();
   const bodyRoot = new THREE.Group();
-  bodyRoot.visible = false;
+  bodyRoot.visible = true;
   group.add(bodyRoot);
   const realModelRoot = new THREE.Group();
   realModelRoot.visible = false;
