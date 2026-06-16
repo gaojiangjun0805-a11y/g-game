@@ -301,7 +301,8 @@ body.factory-skin #btn-music{background:linear-gradient(180deg,#669f72,#35663f);
 .belt-rollers span.lit{background:#6abf74;box-shadow:0 0 12px rgba(98,184,111,.48),inset 0 2px 0 rgba(255,255,255,.22)}
 .factory-wrap.factory-running .belt-rollers span{animation:rollerSpin .24s linear infinite}
 .factory-box{
-  position:absolute;left:var(--progress);top:8px;transform:translateX(-50%);
+  --box-edge:36px;
+  position:absolute;left:clamp(var(--box-edge),var(--progress),calc(100% - var(--box-edge)));top:8px;transform:translateX(-50%);
   min-width:46px;height:34px;padding:0 10px;border-radius:7px;border:2px solid #8a522d;
   background:linear-gradient(180deg,#f0b35c,#ad642f);
   display:grid;place-items:center;color:#2a1609;font-weight:900;font-variant-numeric:tabular-nums;
@@ -310,7 +311,7 @@ body.factory-skin #btn-music{background:linear-gradient(180deg,#669f72,#35663f);
 }
 .factory-box span{line-height:1}
 .factory-box.moving{
-  left:var(--progress-next,var(--progress));
+  left:clamp(var(--box-edge),var(--progress-next,var(--progress)),calc(100% - var(--box-edge)));
   animation:factoryBoxProcess .82s cubic-bezier(.2,.82,.24,1) both;
 }
 .factory-box.moving span{animation:numberFlip .54s ease both}
