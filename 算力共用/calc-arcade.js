@@ -917,6 +917,20 @@
         if(mark === '÷') return 'operator-div';
         return '';
       }
+      function makeMachineTile(op, stageIndex){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `tile machine-tile factory-machine ${machineKind(op.label)}`;
+        btn.innerHTML = `
+          <span class="machine-rivets" aria-hidden="true"></span>
+          <span class="machine-gauge" aria-hidden="true"><i></i></span>
+          <span class="machine-core" aria-hidden="true"><i></i></span>
+          <span class="machine-op"><b>${op.label}</b><small>${machineRole(op.label)}</small></span>
+          <span class="machine-pipe" aria-hidden="true"></span>
+        `;
+        btn.addEventListener('click',() => choose(stageIndex,op));
+        return btn;
+      }
       function valueAfter(count){
         let v = d.start;
         for(let i=0;i<count;i++){
@@ -1014,7 +1028,7 @@
           const bank = document.createElement('div');
           bank.className = 'machine-bank';
           ops.forEach(op => {
-            const tile = api.tile(op.label,machineRole(op.label),`machine-tile factory-machine ${machineKind(op.label)}`,() => choose(stageIndex,op));
+            const tile = makeMachineTile(op,stageIndex);
             if(d.chosen[stageIndex] === op.label) tile.classList.add('selected');
             if(stageIndex !== d.stage) tile.disabled = true;
             bank.appendChild(tile);
