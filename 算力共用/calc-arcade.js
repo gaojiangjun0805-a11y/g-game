@@ -195,7 +195,7 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'tile ' + (className || '');
-      btn.innerHTML = `<b></b><small></small>`;
+      btn.innerHTML = `<b></b><small></small><span class="tap-hand" aria-hidden="true">☝</span>`;
       btn.querySelector('b').textContent = label;
       btn.querySelector('small').textContent = sub || '';
       if(onClick) btn.addEventListener('click', onClick);
@@ -1064,6 +1064,7 @@
           <span class="machine-core" aria-hidden="true"><i></i></span>
           <span class="machine-op"><b>${op.label}</b><small>${machineRole(op.label)}</small></span>
           <span class="machine-pipe" aria-hidden="true"></span>
+          <span class="tap-hand" aria-hidden="true">☝</span>
         `;
         btn.addEventListener('click',event => choose(stageIndex,op,event.currentTarget));
         return btn;
@@ -1119,7 +1120,7 @@
         if(wrap) wrap.classList.add('factory-running');
         if(row) row.classList.add('operating');
         if(tile){
-          tile.classList.remove('hint');
+          tile.classList.remove('hint','tutorial-answer');
           tile.classList.add('selected','operating');
         }
         if(box){

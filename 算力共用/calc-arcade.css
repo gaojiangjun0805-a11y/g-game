@@ -144,8 +144,22 @@ body.factory-skin #stage{align-items:stretch;justify-content:stretch;overflow:au
 .tile.selected{border-color:var(--warm);transform:scale(1.06);box-shadow:0 0 0 3px color-mix(in srgb,var(--warm) 35%,transparent),0 0 22px color-mix(in srgb,var(--warm) 45%,transparent),0 6px 18px rgba(0,0,0,.32)}
 .tile.current{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent),0 0 24px color-mix(in srgb,var(--accent) 36%,transparent)}
 .tile.guide{border-color:var(--accent2);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent2) 28%,transparent),0 0 18px color-mix(in srgb,var(--accent2) 34%,transparent)}
-.tile.hint{animation:hintPulse .7s ease-in-out infinite alternate}
+.tile.hint{overflow:visible;animation:hintPulse .7s ease-in-out infinite alternate}
+.tap-hand{
+  position:absolute;right:3px;top:-13px;z-index:8;width:20px;height:20px;display:grid;place-items:center;
+  font-size:17px;line-height:1;opacity:0;pointer-events:none;color:#fff3bd;
+  text-shadow:0 2px 0 rgba(58,28,12,.7);filter:drop-shadow(0 3px 5px rgba(20,8,3,.35));
+  transform:translateY(-2px) scale(.9) rotate(-14deg);
+}
+.tile.hint .tap-hand,
+.factory-machine.tutorial-answer .tap-hand{animation:tapHand 1.05s ease-in-out infinite}
 @keyframes hintPulse{from{filter:brightness(1.1)}to{filter:brightness(1.65);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 45%,transparent),0 0 28px color-mix(in srgb,var(--accent) 55%,transparent)}}
+@keyframes tapHand{
+  0%,100%{opacity:.28;transform:translateY(-4px) scale(.86) rotate(-14deg)}
+  38%{opacity:.95;transform:translateY(4px) scale(.98) rotate(-8deg)}
+  54%{opacity:.72;transform:translateY(7px) scale(.9) rotate(-8deg)}
+  72%{opacity:.42;transform:translateY(-1px) scale(.88) rotate(-14deg)}
+}
 .tile.disabled{opacity:.18;pointer-events:none}
 .tile.empty{opacity:.18;pointer-events:none;background:rgba(255,255,255,.04);color:transparent}
 .tile.bad{animation:badShake .18s linear 2;border-color:#fb7185!important}
@@ -360,6 +374,8 @@ body.factory-skin #btn-music{background:linear-gradient(180deg,#669f72,#35663f);
   color:#251207;box-shadow:0 5px 0 #59331d,0 9px 15px rgba(18,8,3,.28),inset 0 2px 0 rgba(255,242,194,.28);
   isolation:isolate;
 }
+.factory-machine.hint,
+.factory-machine.tutorial-answer{overflow:visible}
 .factory-machine::before{height:36%;background:linear-gradient(180deg,rgba(255,247,209,.32),transparent)}
 .factory-machine::after{
   content:"";position:absolute;left:4px;right:4px;bottom:3px;height:3px;border-radius:999px;
@@ -574,6 +590,14 @@ body.factory-skin #btn-music{background:linear-gradient(180deg,#669f72,#35663f);
 .fraction-card.dark,.auction-card.dark,.clock-card.dark{background:linear-gradient(135deg,#1b233d,#0b1024);color:#edf4ff;border-color:rgba(120,145,210,.36)}
 .fraction-card:active,.auction-card:active,.clock-card:active{transform:scale(.95)}
 .fraction-card.selected,.auction-card.selected,.clock-card.selected{border-color:var(--warm);box-shadow:0 0 0 3px color-mix(in srgb,var(--warm) 35%,transparent),0 0 22px color-mix(in srgb,var(--warm) 45%,transparent)}
+.fraction-card.hint,.auction-card.hint,.clock-card.hint{
+  position:relative;overflow:visible;animation:hintPulse .7s ease-in-out infinite alternate;
+}
+.fraction-card.hint::after,.auction-card.hint::after,.clock-card.hint::after{
+  content:"☝";position:absolute;right:5px;top:-14px;z-index:8;width:20px;height:20px;display:grid;place-items:center;
+  font-size:17px;line-height:1;color:#fff3bd;text-shadow:0 2px 0 rgba(58,28,12,.7);
+  filter:drop-shadow(0 3px 5px rgba(20,8,3,.35));pointer-events:none;animation:tapHand 1.05s ease-in-out infinite;
+}
 .fraction-card b,.auction-card b,.clock-card b{font-size:1.05rem;line-height:1;font-variant-numeric:tabular-nums}
 .fraction-card small,.auction-card small,.clock-card small{font-size:.58rem;opacity:.68}
 .fraction-meter{height:18px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.22);overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
