@@ -165,10 +165,11 @@ body.factory-skin .read-box{
 }
 body.factory-skin .read-box span{color:#d5a96d}
 body.factory-skin .read-box b{color:#ffe5a6}
-#mode-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:7px}
+#mode-actions{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:1px}
 .mini-btn,#buttons button{
   min-height:36px;border:none;border-radius:999px;padding:0 9px;cursor:pointer;font-size:.74rem;font-weight:900;
   background:rgba(255,255,255,.1);box-shadow:0 8px 20px rgba(0,0,0,.24);
+  display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;line-height:1;
 }
 .mini-btn.primary,#btn-new{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#07101d}
 #btn-hint{background:linear-gradient(135deg,var(--warm),#f59e0b);color:#171221}
