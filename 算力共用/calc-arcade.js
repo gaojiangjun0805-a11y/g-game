@@ -34,6 +34,7 @@
   document.documentElement.style.setProperty('--accent2', cfg.accent2 || '#7df0a0');
   document.documentElement.style.setProperty('--warm', cfg.warm || '#ffe08a');
   document.title = cfg.title || '计算力游戏';
+  document.body.classList.toggle('factory-skin', cfg.mode === 'factoryLine');
 
   document.body.innerHTML = `
     <canvas id="bg-canvas"></canvas>
@@ -61,7 +62,7 @@
         <div class="hud-item"><span>分数</span><b id="score">0</b></div>
         <div class="hud-item"><span>连击</span><b id="combo">0</b></div>
         <div class="hud-item"><span>时间</span><b id="timer">0s</b></div>
-        <div class="hud-item"><span>进度</span><b id="done">0/0</b></div>
+        <div class="hud-item"><span id="done-label">进度</span><b id="done">0/0</b></div>
       </section>
       <main id="play">
         <section id="target-card" class="glass">
@@ -97,7 +98,7 @@
   const el = {
     welcome:$('welcome-mask'), welcomeTitle:$('welcome-title'), welcomeSub:$('welcome-sub'), welcomeDemo:$('welcome-demo'),
     title:$('game-title'), subtitle:$('subtitle'), kicker:$('level-kicker'), size:$('level-size'), name:$('level-name'), note:$('level-note'), rail:$('progress-rail'),
-    score:$('score'), combo:$('combo'), timer:$('timer'), done:$('done'),
+    score:$('score'), combo:$('combo'), timer:$('timer'), done:$('done'), doneLabel:$('done-label'),
     targetTitle:$('target-title'), targetValue:$('target-value'), targetNote:$('target-note'),
     stage:$('stage'), readout:$('readout'), msg:$('msg'),
     btnNew:$('btn-new'), btnHint:$('btn-hint'), btnMusic:$('btn-music'),
@@ -132,9 +133,13 @@
     data:null
   };
   function isEndless(){ return !!(cfg.endless || cfg.infinite); }
+  function isRoundTimer(){ return !!cfg.perRoundTimer; }
+  function isRoundOnly(){ return !!(cfg.roundOnly || cfg.hideProgressRail || isRoundTimer()); }
   function targetGoal(){ return cfg.goal || 8; }
   function railGoal(){ return isEndless() ? (cfg.progressWindow || 12) : targetGoal(); }
   function goalLabel(){ return isEndless() ? '∞' : targetGoal(); }
+  document.documentElement.classList.toggle('hide-progress-rail', isRoundOnly());
+  if(el.doneLabel) el.doneLabel.textContent = isRoundOnly() ? '局数' : '进度';
   const api = {
     tools,
     state,
@@ -144,8 +149,14 @@
       el.targetValue.textContent = value || '';
       el.targetNote.textContent = note || '';
     },
+    beginRound(seconds){
+      if(!isRoundTimer()) return;
+      const fallback = cfg.timeLimit || 30;
+      state.timeLeft = Math.max(1, Math.round(seconds || fallback));
+      updateHud();
+    },
     setLevel(name,note,size){
-      el.kicker.textContent = isEndless() ? `第 ${state.solved + 1} 局 · 无限` : `第 ${state.solved + 1} / ${targetGoal()} 局`;
+      el.kicker.textContent = isRoundOnly() ? `第 ${state.solved + 1} 局` : isEndless() ? `第 ${state.solved + 1} 局 · 无限` : `第 ${state.solved + 1} / ${targetGoal()} 局`;
       el.size.textContent = size || cfg.badge || '计算力';
       el.name.textContent = name || cfg.title || '';
       el.note.textContent = note || '';
@@ -230,7 +241,7 @@
       api.award(points || 160);
       state.solved++;
       let message = text || '完成一局';
-      if(isEndless() && cfg.roundTimeBonus){
+      if(isEndless() && !isRoundTimer() && cfg.roundTimeBonus){
         const cap = cfg.maxTimeLimit || cfg.timeLimit || 180;
         const rampEvery = cfg.bonusRampEvery || 0;
         const ramp = rampEvery ? Math.floor(Math.max(0,state.solved - 1) / rampEvery) * (cfg.bonusRamp || 0) : 0;
@@ -254,6 +265,10 @@
   };
 
   function renderRail(){
+    if(isRoundOnly()){
+      el.rail.innerHTML = '';
+      return;
+    }
     const goal = railGoal();
     document.documentElement.style.setProperty('--goal', goal);
     let html = '';
@@ -268,7 +283,7 @@
     el.combo.textContent = String(state.combo);
     el.timer.textContent = `${state.timeLeft}s`;
     el.timer.classList.toggle('low', state.timeLeft <= 18);
-    el.done.textContent = `${state.solved}/${goalLabel()}`;
+    el.done.textContent = isRoundOnly() ? `第${state.solved + 1}` : `${state.solved}/${goalLabel()}`;
     renderRail();
   }
   function startGame(){
@@ -289,7 +304,7 @@
     state.mode.next();
     updateHud();
     state.timer = setInterval(() => {
-      if(!state.active) return;
+      if(!state.active || (isRoundTimer() && state.locked)) return;
       state.timeLeft--;
       updateHud();
       if(state.timeLeft <= 0) finish(false);
@@ -310,9 +325,9 @@
     }else if(cleared && accuracy >= .92 && state.hints <= 2) rank = 'S';
     else if(cleared && accuracy >= .82) rank = 'A';
     else if(state.solved >= Math.ceil(targetGoal() * .65)) rank = 'B';
-    el.settleTitle.textContent = cleared ? '挑战完成' : (isEndless() ? '脉冲中断' : '时间到');
+    el.settleTitle.textContent = cleared ? '挑战完成' : (isRoundTimer() ? '本局超时' : isEndless() ? '脉冲中断' : '时间到');
     el.settleRank.textContent = rank;
-    el.settleSub.textContent = `${state.solved}/${goalLabel()} 局 · 失误 ${state.mistakes} · 提示 ${state.hints}`;
+    el.settleSub.textContent = isRoundOnly() ? `完成 ${state.solved} 局 · 失误 ${state.mistakes} · 提示 ${state.hints}` : `${state.solved}/${goalLabel()} 局 · 失误 ${state.mistakes} · 提示 ${state.hints}`;
     el.settleRows.innerHTML = [
       ['最终分数',Math.round(state.score)],
       ['时间奖励',timeBonus],
@@ -344,39 +359,40 @@
         if(round === 1){
           return {
             name:'校准脉冲 I', note:'照着微光连 3 格，感受合计正好闭合。', badge:'教学',
-            cols:5, rows:5, min:1, max:9, minLen:3, maxLen:3, diag:true, guide:'full'
+            cols:5, rows:5, min:1, max:9, minLen:3, maxLen:3, diag:true, guide:'full', time:16
           };
         }
         if(round === 2){
           return {
             name:'校准脉冲 II', note:'斜向也能接，第二局只提示下一格。', badge:'教学',
-            cols:5, rows:5, min:2, max:12, minLen:3, maxLen:3, diag:true, guide:'next'
+            cols:5, rows:5, min:2, max:12, minLen:3, maxLen:3, diag:true, guide:'next', time:18
           };
         }
         if(round <= 5){
           return {
             name:'加速链路', note:'目标链开始变化，先看差值再决定下一步。', badge:'加速',
-            cols:6, rows:5, min:2, max:14 + round, minLen:3, maxLen:4, diag:true
+            cols:6, rows:5, min:2, max:14 + round, minLen:3, maxLen:4, diag:true, time:20 + round
           };
         }
         if(round <= 9){
           return {
             name:'多频脉冲', note:'链路更长，别让当前合计越过目标。', badge:'多频',
-            cols:6, rows:6, min:3, max:18 + round, minLen:4, maxLen:5, diag:true
+            cols:6, rows:6, min:3, max:18 + round, minLen:4, maxLen:5, diag:true, time:28 + Math.floor((round - 6) / 2) * 2
           };
         }
         if(round <= 14){
           return {
             name:'高压链路', note:'数值抬升，短链不一定够，留出回退空间。', badge:'高压',
-            cols:6, rows:6, min:4, max:24 + round, minLen:4, maxLen:6, diag:true
+            cols:6, rows:6, min:4, max:24 + round, minLen:4, maxLen:6, diag:true, time:34 + (round - 10) * 2
           };
         }
         const tier = Math.floor((round - 15) / 6);
         return {
-          name:`无限脉冲 ${tier + 1}`, note:'无限轮开始，完成一局会回充时间，撑得越久分数越高。', badge:'无限',
+          name:`无限脉冲 ${tier + 1}`, note:'无限轮继续推进，后面的链更长，单关时间也会更宽裕。', badge:'无限',
           cols:Math.min(7,6 + (tier >= 2 ? 1 : 0)), rows:6,
           min:5 + Math.min(7,tier), max:34 + round * 2,
-          minLen:5, maxLen:Math.min(7,6 + Math.floor(tier / 2)), diag:true
+          minLen:5, maxLen:Math.min(7,6 + Math.floor(tier / 2)), diag:true,
+          time:Math.min(70,46 + tier * 4 + Math.floor((round - 15) / 2))
         };
       }
       function randNum(){ return tools.int(state.rand,d.profile.min,d.profile.max); }
@@ -405,6 +421,7 @@
       }
       function next(){
         d.profile = profile();
+        api.beginRound(d.profile.time);
         fill();
         d.selected = [];
         makeTarget();
@@ -448,7 +465,7 @@
       function render(){
         api.setGrid(C,R);
         api.setLevel(d.profile.name,d.profile.note,d.profile.badge || '凑和');
-        api.setTarget('目标能量',d.target,`当前链路 ${sum()} / ${d.target} · 需要 ${d.profile.minLen}-${d.profile.maxLen} 格`);
+        api.setTarget('目标能量',d.target,`当前链路 ${sum()} / ${d.target} · 需要 ${d.profile.minLen}-${d.profile.maxLen} 格 · 限时 ${d.profile.time}s`);
         el.stage.innerHTML = '<div class="grid"></div>';
         const grid = el.stage.querySelector('.grid');
         d.board.forEach((n,i) => {
@@ -884,13 +901,40 @@
         return Number.isInteger(n) && n > 0 && n <= 420 ? n : NaN;
       }
       function validOps(v){ return opDefs.filter(op => Number.isInteger(apply(v,op))); }
+      function machineRole(label){
+        const mark = label[0];
+        if(mark === '+') return '加料机';
+        if(mark === '-') return '切削机';
+        if(mark === '×') return '倍增炉';
+        if(mark === '÷') return '分装机';
+        return '机器';
+      }
+      function machineKind(label){
+        const mark = label[0];
+        if(mark === '+') return 'operator-add';
+        if(mark === '-') return 'operator-sub';
+        if(mark === '×') return 'operator-mul';
+        if(mark === '÷') return 'operator-div';
+        return '';
+      }
+      function valueAfter(count){
+        let v = d.start;
+        for(let i=0;i<count;i++){
+          const op = opDefs.find(item => item.label === d.chosen[i]);
+          if(!op) return null;
+          const nextValue = apply(v,op);
+          if(!Number.isInteger(nextValue)) return null;
+          v = nextValue;
+        }
+        return v;
+      }
       function next(){
         d.stage = 0; d.chosen = [];
         d.start = tools.int(state.rand,6,32);
         d.value = d.start;
         d.solution = [];
         let v = d.start;
-        const stageCount = 4 + Math.min(1,Math.floor(state.solved / 4));
+        const stageCount = 4;
         for(let i=0;i<stageCount;i++){
           const pool = validOps(v).filter(op => op.label[0] !== '-' || v > 14);
           const op = tools.choice(state.rand,pool.length ? pool : validOps(v));
@@ -924,23 +968,67 @@
         }
       }
       function render(){
-        api.setLevel('算符流水线','每层只能选一台机器，把输入数加工成目标出厂数。','流水线');
-        api.setTarget('出厂目标',d.target,`当前 ${d.value} · 第 ${d.stage + 1}/${d.stages.length} 层`);
-        el.stage.innerHTML = '<div class="factory-wrap"></div>';
+        api.setLevel('算符流水线','1-4 号工位依次加工，每个工位只选一台机器。','四步流水线');
+        api.setTarget('订单出厂数',d.target,`当前原料 ${d.value} · 正在 ${Math.min(d.stage + 1,d.stages.length)} 号工位`);
+        const progress = Math.min(100,(d.stage / Math.max(1,d.stages.length - 1)) * 100);
+        const chosenText = d.chosen.length ? d.chosen.join(' → ') : '等待 1 号工位开机';
+        el.stage.innerHTML = `
+          <div class="factory-wrap">
+            <div class="factory-roofline" aria-hidden="true">
+              <span class="factory-stack tall"></span>
+              <span class="factory-stack"></span>
+              <span class="factory-window"></span>
+              <span class="factory-window"></span>
+              <span class="factory-window"></span>
+            </div>
+            <div class="factory-head">
+              <div class="factory-crate">
+                <span>原料箱</span>
+                <b>${d.start}</b>
+              </div>
+              <div class="factory-belt-track" style="--progress:${progress}%">
+                <div class="belt-rollers" aria-hidden="true">
+                  ${d.stages.map((_,i) => `<span class="${i <= d.stage ? 'lit' : ''}"></span>`).join('')}
+                </div>
+                <div class="factory-box"><span>${d.value}</span></div>
+              </div>
+              <div class="factory-crate target">
+                <span>订单箱</span>
+                <b>${d.target}</b>
+              </div>
+            </div>
+            <div class="factory-stations"></div>
+          </div>
+        `;
         const wrap = el.stage.querySelector('.factory-wrap');
+        const stations = wrap.querySelector('.factory-stations');
         d.stages.forEach((ops,stageIndex) => {
           const row = document.createElement('div');
-          row.className = 'factory-row ' + (stageIndex < d.stage ? 'locked' : stageIndex === d.stage ? 'active' : '');
+          const stageState = stageIndex < d.stage ? 'locked' : stageIndex === d.stage ? 'active' : 'pending';
+          const processedValue = stageIndex < d.chosen.length ? valueAfter(stageIndex + 1) : null;
+          row.className = 'factory-row ' + stageState;
           const label = document.createElement('div');
           label.className = 'factory-label';
-          label.textContent = stageIndex + 1;
+          label.innerHTML = `<span>工位</span><b>${stageIndex + 1}</b>`;
           row.appendChild(label);
+          const bank = document.createElement('div');
+          bank.className = 'machine-bank';
           ops.forEach(op => {
-            const tile = api.tile(op.label,'机器','machine-tile ' + (stageIndex % 2 ? 'dark' : ''),() => choose(stageIndex,op));
+            const tile = api.tile(op.label,machineRole(op.label),`machine-tile factory-machine ${machineKind(op.label)}`,() => choose(stageIndex,op));
             if(d.chosen[stageIndex] === op.label) tile.classList.add('selected');
-            row.appendChild(tile);
+            if(stageIndex !== d.stage) tile.disabled = true;
+            bank.appendChild(tile);
           });
-          wrap.appendChild(row);
+          row.appendChild(bank);
+          const output = document.createElement('div');
+          output.className = 'factory-output';
+          output.innerHTML = stageIndex < d.chosen.length
+            ? `<span>已加工</span><b>${processedValue}</b>`
+            : stageIndex === d.stage
+              ? '<span>当前</span><b>待选机</b>'
+              : '<span>排队</span><b>待传送</b>';
+          row.appendChild(output);
+          stations.appendChild(row);
         });
         api.read([
           ['输入',d.start],
@@ -948,17 +1036,17 @@
           ['目标',d.target]
         ],[
           {label:'↺ 回炉',onClick:reset,primary:true},
-          {label:'层数',onClick:() => api.message(`${d.stages.length} 层流水线`)},
-          {label:'规则',onClick:() => api.message('每层选一台，顺序会影响结果')}
+          {label:'流程',onClick:() => api.message(chosenText)},
+          {label:'规则',onClick:() => api.message('按 1 到 4 号工位依次选机器')}
         ]);
       }
       function hint(){
         state.hints++;
         const want = d.solution[d.stage]?.label;
-        Array.from(el.stage.querySelectorAll('.factory-row.active .tile')).forEach(tile => {
+        Array.from(el.stage.querySelectorAll('.factory-row.active .factory-machine')).forEach(tile => {
           if(tile.textContent.includes(want)) tile.classList.add('hint');
         });
-        api.message(`这一层试试 ${want}`);
+        api.message(`${d.stage + 1} 号工位试试 ${want}`);
         hintSound();
       }
       return {next,hint,render};
