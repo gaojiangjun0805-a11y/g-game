@@ -84,8 +84,11 @@
       <div class="modal">
         <div id="settle-title"></div>
         <div id="settle-rank">S</div>
+        <div id="settle-stars">★★★</div>
         <div id="settle-sub"></div>
         <div id="settle-rows"></div>
+        <div id="settle-total"><span>总分</span><b id="settle-total-val">0</b></div>
+        <div id="settle-best"></div>
         <div class="settle-actions">
           <button id="settle-again" type="button">再来一局</button>
           <button id="settle-close" class="secondary" type="button">关闭</button>
@@ -102,7 +105,7 @@
     targetTitle:$('target-title'), targetValue:$('target-value'), targetNote:$('target-note'),
     stage:$('stage'), readout:$('readout'), msg:$('msg'),
     btnNew:$('btn-new'), btnHint:$('btn-hint'), btnMusic:$('btn-music'),
-    settle:$('settle-mask'), settleTitle:$('settle-title'), settleRank:$('settle-rank'), settleSub:$('settle-sub'), settleRows:$('settle-rows'),
+    settle:$('settle-mask'), settleTitle:$('settle-title'), settleRank:$('settle-rank'), settleStars:$('settle-stars'), settleSub:$('settle-sub'), settleRows:$('settle-rows'), settleTotal:$('settle-total'), settleTotalVal:$('settle-total-val'), settleBest:$('settle-best'),
     settleAgain:$('settle-again'), settleClose:$('settle-close'), welcomeStart:$('welcome-start')
   };
 
@@ -125,16 +128,20 @@
     bestCombo:0,
     solved:0,
     mistakes:0,
+    roundMistakes:0,
     hints:0,
     locked:false,
     timeLeft:cfg.timeLimit || 180,
+    roundLimit:cfg.timeLimit || 180,
     timer:null,
+    pendingNext:null,
     mode:null,
     data:null
   };
   function isEndless(){ return !!(cfg.endless || cfg.infinite); }
   function isRoundTimer(){ return !!cfg.perRoundTimer; }
   function isRoundOnly(){ return !!(cfg.roundOnly || cfg.hideProgressRail || isRoundTimer()); }
+  function minRoundTime(){ return cfg.minRoundTime || 1; }
   function targetGoal(){ return cfg.goal || 8; }
   function railGoal(){ return isEndless() ? (cfg.progressWindow || 12) : targetGoal(); }
   function goalLabel(){ return isEndless() ? '∞' : targetGoal(); }
@@ -152,7 +159,9 @@
     beginRound(seconds){
       if(!isRoundTimer()) return;
       const fallback = cfg.timeLimit || 30;
-      state.timeLeft = Math.max(1, Math.round(seconds || fallback));
+      state.timeLeft = Math.max(minRoundTime(), Math.round(seconds || fallback));
+      state.roundLimit = state.timeLeft;
+      state.roundMistakes = 0;
       updateHud();
     },
     setLevel(name,note,size){
@@ -229,6 +238,7 @@
     mistake(text){
       state.combo = 0;
       state.mistakes++;
+      state.roundMistakes++;
       state.timeLeft = Math.max(0, state.timeLeft - (cfg.penalty || 4));
       el.msg.textContent = text || '算错一步，节奏断了';
       badSound();
@@ -238,7 +248,7 @@
     complete(points, text){
       if(state.locked) return;
       state.locked = true;
-      api.award(points || 160);
+      const gain = api.award(points || 160);
       state.solved++;
       let message = text || '完成一局';
       if(isEndless() && !isRoundTimer() && cfg.roundTimeBonus){
@@ -253,13 +263,18 @@
       }
       el.msg.textContent = message;
       updateHud();
+      if(cfg.roundSettlement && isRoundTimer()){
+        showRoundSettlement(message,gain);
+        return;
+      }
+      const delay = 520;
       if(!isEndless() && state.solved >= targetGoal()){
-        setTimeout(() => finish(true), 520);
+        setTimeout(() => finish(true), delay);
       }else{
         setTimeout(() => {
           state.locked = false;
           state.mode.next();
-        }, 520);
+        }, delay);
       }
     }
   };
@@ -298,8 +313,12 @@
     state.hints = 0;
     state.locked = false;
     state.timeLeft = cfg.timeLimit || 180;
+    state.roundLimit = state.timeLeft;
+    state.roundMistakes = 0;
     state.data = {};
+    state.pendingNext = null;
     el.settle.classList.remove('show');
+    el.settle.classList.remove('round-settle');
     state.mode = modes[cfg.mode](api);
     state.mode.next();
     updateHud();
@@ -327,6 +346,9 @@
     else if(state.solved >= Math.ceil(targetGoal() * .65)) rank = 'B';
     el.settleTitle.textContent = cleared ? '挑战完成' : (isRoundTimer() ? '本局超时' : isEndless() ? '脉冲中断' : '时间到');
     el.settleRank.textContent = rank;
+    el.settleRank.className = '';
+    el.settleStars.className = '';
+    el.settleStars.textContent = starsForRank(rank);
     el.settleSub.textContent = isRoundOnly() ? `完成 ${state.solved} 局 · 失误 ${state.mistakes} · 提示 ${state.hints}` : `${state.solved}/${goalLabel()} 局 · 失误 ${state.mistakes} · 提示 ${state.hints}`;
     el.settleRows.innerHTML = [
       ['最终分数',Math.round(state.score)],
@@ -334,11 +356,70 @@
       ['最高连击',state.bestCombo],
       ['玩法',cfg.title || '计算力']
     ].map(([k,v]) => `<div class="settle-row"><span>${k}</span><b>${v}</b></div>`).join('');
+    el.settleTotalVal.textContent = Math.round(state.score);
+    el.settleBest.textContent = cleared ? '' : '本局没有在限时内完成';
+    el.settleAgain.textContent = '再来一局';
+    el.settleClose.textContent = '关闭';
+    el.settle.classList.remove('round-settle');
     el.settle.classList.add('show');
     cleared ? winSound() : badSound();
     updateHud();
   }
-
+  function rankForRound(){
+    const ratio = state.timeLeft / Math.max(1,state.roundLimit || state.timeLeft || 1);
+    if(state.roundMistakes === 0 && ratio >= .7) return {grade:'S',color:'#ffe08a'};
+    if(state.roundMistakes <= 1 && ratio >= .45) return {grade:'A',color:'#7dd3fc'};
+    if(state.roundMistakes <= 2 && ratio >= .2) return {grade:'B',color:'#a7f3d0'};
+    return {grade:'C',color:'#c4b5fd'};
+  }
+  function starsForRank(rank){
+    if(rank === 'S') return '★★★';
+    if(rank === 'A') return '★★☆';
+    if(rank === 'B') return '★☆☆';
+    return '☆☆☆';
+  }
+  function continueRoundSettlement(){
+    if(!state.pendingNext) return false;
+    const next = state.pendingNext;
+    state.pendingNext = null;
+    el.settle.classList.remove('show','round-settle');
+    state.locked = false;
+    next();
+    return true;
+  }
+  function showRoundSettlement(title,gain){
+    const roundNo = state.solved;
+    const rk = rankForRound();
+    state.pendingNext = () => state.mode.next();
+    el.settleTitle.textContent = title || '关卡完成';
+    el.settleSub.textContent = `第 ${roundNo} 局 · 剩余 ${state.timeLeft}s · 本局失误 ${state.roundMistakes}`;
+    el.settleRank.className = 'counting';
+    el.settleRank.style.color = '';
+    el.settleRank.textContent = '计算中…';
+    el.settleStars.className = '';
+    el.settleStars.textContent = starsForRank(rk.grade);
+    el.settleRows.innerHTML = [
+      ['通关奖励',`+${gain}`],
+      ['剩余时间',`${state.timeLeft}s / ${state.roundLimit}s`],
+      ['本局失误',state.roundMistakes],
+      ['当前连击',state.combo]
+    ].map(([k,v]) => `<div class="settle-row"><span>${k}</span><b>${v}</b></div>`).join('');
+    el.settleTotalVal.textContent = Math.round(state.score);
+    el.settleBest.textContent = '下一局会重新计时，继续推进无限脉冲';
+    el.settleAgain.textContent = '下一关';
+    el.settleClose.textContent = '继续';
+    el.settle.classList.add('round-settle','show');
+    winSound();
+    setTimeout(() => {
+      if(!state.pendingNext) return;
+      el.settleRank.className = '';
+      el.settleRank.style.color = rk.color;
+      el.settleRank.textContent = rk.grade;
+      void el.settleRank.offsetWidth;
+      el.settleRank.classList.add('reveal');
+      el.settleStars.classList.add('reveal');
+    },520);
+  }
   const dirs4 = [[1,0],[-1,0],[0,1],[0,-1]];
   const dirs8 = dirs4.concat([[1,1],[1,-1],[-1,1],[-1,-1]]);
   function idx(r,c,cols){ return r * cols + c; }
@@ -359,31 +440,31 @@
         if(round === 1){
           return {
             name:'校准脉冲 I', note:'照着微光连 3 格，感受合计正好闭合。', badge:'教学',
-            cols:5, rows:5, min:1, max:9, minLen:3, maxLen:3, diag:true, guide:'full', time:16
+            cols:5, rows:5, min:1, max:9, minLen:3, maxLen:3, diag:true, guide:'full', time:90
           };
         }
         if(round === 2){
           return {
             name:'校准脉冲 II', note:'斜向也能接，第二局只提示下一格。', badge:'教学',
-            cols:5, rows:5, min:2, max:12, minLen:3, maxLen:3, diag:true, guide:'next', time:18
+            cols:5, rows:5, min:2, max:12, minLen:3, maxLen:3, diag:true, guide:'next', time:90
           };
         }
         if(round <= 5){
           return {
             name:'加速链路', note:'目标链开始变化，先看差值再决定下一步。', badge:'加速',
-            cols:6, rows:5, min:2, max:14 + round, minLen:3, maxLen:4, diag:true, time:20 + round
+            cols:6, rows:5, min:2, max:14 + round, minLen:3, maxLen:4, diag:true, time:90 + (round - 3) * 5
           };
         }
         if(round <= 9){
           return {
             name:'多频脉冲', note:'链路更长，别让当前合计越过目标。', badge:'多频',
-            cols:6, rows:6, min:3, max:18 + round, minLen:4, maxLen:5, diag:true, time:28 + Math.floor((round - 6) / 2) * 2
+            cols:6, rows:6, min:3, max:18 + round, minLen:4, maxLen:5, diag:true, time:105 + (round - 6) * 5
           };
         }
         if(round <= 14){
           return {
             name:'高压链路', note:'数值抬升，短链不一定够，留出回退空间。', badge:'高压',
-            cols:6, rows:6, min:4, max:24 + round, minLen:4, maxLen:6, diag:true, time:34 + (round - 10) * 2
+            cols:6, rows:6, min:4, max:24 + round, minLen:4, maxLen:6, diag:true, time:130 + (round - 10) * 6
           };
         }
         const tier = Math.floor((round - 15) / 6);
@@ -392,7 +473,7 @@
           cols:Math.min(7,6 + (tier >= 2 ? 1 : 0)), rows:6,
           min:5 + Math.min(7,tier), max:34 + round * 2,
           minLen:5, maxLen:Math.min(7,6 + Math.floor(tier / 2)), diag:true,
-          time:Math.min(70,46 + tier * 4 + Math.floor((round - 15) / 2))
+          time:Math.min(240,160 + tier * 10 + Math.floor((round - 15) / 2) * 4)
         };
       }
       function randNum(){ return tools.int(state.rand,d.profile.min,d.profile.max); }
@@ -421,6 +502,7 @@
       }
       function next(){
         d.profile = profile();
+        d.profile.time = Math.max(minRoundTime(), d.profile.time || cfg.timeLimit || 90);
         api.beginRound(d.profile.time);
         fill();
         d.selected = [];
@@ -923,7 +1005,6 @@
         btn.className = `tile machine-tile factory-machine ${machineKind(op.label)}`;
         btn.innerHTML = `
           <span class="machine-rivets" aria-hidden="true"></span>
-          <span class="machine-gauge" aria-hidden="true"><i></i></span>
           <span class="machine-core" aria-hidden="true"><i></i></span>
           <span class="machine-op"><b>${op.label}</b><small>${machineRole(op.label)}</small></span>
           <span class="machine-pipe" aria-hidden="true"></span>
@@ -957,7 +1038,7 @@
         }
         d.target = v;
         d.stages = d.solution.map((sol,idxStage) => {
-          const decoys = tools.shuffle(state.rand,opDefs.filter(op => op.label !== sol.label)).slice(0,2);
+          const decoys = tools.shuffle(state.rand,opDefs.filter(op => op.label !== sol.label)).slice(0,3);
           return tools.shuffle(state.rand,[sol].concat(decoys));
         });
         render();
@@ -1034,14 +1115,6 @@
             bank.appendChild(tile);
           });
           row.appendChild(bank);
-          const output = document.createElement('div');
-          output.className = 'factory-output';
-          output.innerHTML = stageIndex < d.chosen.length
-            ? `<span>已加工</span><b>${processedValue}</b>`
-            : stageIndex === d.stage
-              ? '<span>当前</span><b>待选机</b>'
-              : '<span>排队</span><b>待传送</b>';
-          row.appendChild(output);
           stations.appendChild(row);
         });
         api.read([
@@ -1473,8 +1546,14 @@
     if(state.active && !state.locked && state.mode && state.mode.hint) state.mode.hint();
   });
   el.btnMusic.addEventListener('click',toggleMusic);
-  el.settleAgain.addEventListener('click',startGame);
-  el.settleClose.addEventListener('click',() => el.settle.classList.remove('show'));
+  el.settleAgain.addEventListener('click',() => {
+    if(continueRoundSettlement()) return;
+    startGame();
+  });
+  el.settleClose.addEventListener('click',() => {
+    if(continueRoundSettlement()) return;
+    el.settle.classList.remove('show');
+  });
 
   if(!modes[cfg.mode]){
     el.msg.textContent = '缺少玩法模式';
