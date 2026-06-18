@@ -692,8 +692,6 @@ body.factory-skin .settle-actions button{border-radius:8px;background:linear-gra
 }
 @media (max-width:560px){
   #hubReturnBtn{top:calc(env(safe-area-inset-top) + 52px)}
-}
-@media (max-width:560px){
   body.factory-skin .factory-machine{grid-template-columns:1fr;padding:4px}
   body.factory-skin .factory-machine b{font-size:.96rem}
   body.factory-skin .machine-op{min-width:0;width:100%}
