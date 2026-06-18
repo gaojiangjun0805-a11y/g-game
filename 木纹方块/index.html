@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>沙画方块 · SAND.SYS</title>
+<style>
+  :root{
+    --bg0:#05070f;
+    --cyan:#26e0ff;
+    --cyan-dim:#0bb6d6;
+    --violet:#9b6cff;
+    --glass:rgba(14,24,44,.62);
+    --glass-line:rgba(90,180,255,.22);
+    --text:#dff3ff;
+    --muted:#6f93b6;
+    --glow:rgba(38,224,255,.55);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
+  html,body{height:100%;margin:0;}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    color:var(--text);
+    background:
+      radial-gradient(820px 520px at 50% -8%, rgba(38,224,255,.12), transparent 60%),
+      radial-gradient(700px 620px at 108% 112%, rgba(155,108,255,.13), transparent 55%),
+      repeating-linear-gradient(0deg, rgba(60,150,220,.045) 0 1px, transparent 1px 42px),
+      repeating-linear-gradient(90deg, rgba(60,150,220,.045) 0 1px, transparent 1px 42px),
+      var(--bg0);
+    height:100%;overflow:hidden;touch-action:none;
+  }
+  .app{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;padding:10px 12px 14px;gap:10px;}
+
+  .hud{
+    display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:8px;
+    background:var(--glass);
+    border:1px solid var(--glass-line);border-radius:12px;padding:9px 6px;
+    backdrop-filter:blur(8px);
+    box-shadow:0 0 0 1px rgba(38,224,255,.06), 0 10px 30px rgba(0,0,0,.5), inset 0 1px 0 rgba(160,220,255,.10);
+    position:relative;
+  }
+  .hud::before{content:"";position:absolute;left:14px;right:14px;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:.6;}
+  .hud .cell{text-align:center;border-radius:10px;padding:2px;}
+  .hud .cell+.cell{box-shadow:inset 1px 0 0 rgba(90,180,255,.14);}
+  .hud .label{font-size:11px;letter-spacing:4px;color:var(--muted);font-weight:700;font-family:ui-monospace,Menlo,Consolas,monospace;}
+  .hud .value{font-size:26px;font-weight:800;margin-top:2px;line-height:1.1;color:var(--cyan);font-variant-numeric:tabular-nums;font-family:ui-monospace,Menlo,Consolas,monospace;text-shadow:0 0 12px var(--glow);}
+  .hud .value.big{font-size:30px;color:#eafcff;text-shadow:0 0 16px var(--glow);}
+
+  .board-area{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;position:relative;}
+  #board{display:block;border-radius:14px;box-shadow:0 0 36px rgba(38,224,255,.16), 0 14px 40px rgba(0,0,0,.6);touch-action:none;}
+
+  .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:rgba(5,9,18,.72);backdrop-filter:blur(4px);border-radius:14px;text-align:center;padding:24px;}
+  .overlay.show{display:flex;}
+  .overlay h2{margin:0;font-size:30px;letter-spacing:6px;color:#eafcff;text-shadow:0 0 18px var(--glow);font-weight:800;}
+  .overlay p{margin:0;color:var(--muted);font-size:14px;line-height:1.7;max-width:290px;}
+  .overlay .final{font-size:18px;color:var(--cyan);font-weight:800;font-family:ui-monospace,Menlo,monospace;text-shadow:0 0 12px var(--glow);}
+  .btn{border:1px solid var(--cyan);background:linear-gradient(180deg,rgba(38,224,255,.18),rgba(38,224,255,.06));color:#eafcff;font-weight:800;font-size:16px;letter-spacing:3px;padding:13px 34px;border-radius:11px;cursor:pointer;box-shadow:0 0 18px rgba(38,224,255,.30), inset 0 0 14px rgba(38,224,255,.12);transition:transform .08s, box-shadow .12s, background .12s;}
+  .btn:hover{background:linear-gradient(180deg,rgba(38,224,255,.30),rgba(38,224,255,.12));box-shadow:0 0 26px rgba(38,224,255,.5), inset 0 0 16px rgba(38,224,255,.2);}
+  .btn:active{transform:translateY(2px);}
+
+  .controls{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+  .ctl{border:1px solid var(--glass-line);background:var(--glass);color:var(--text);border-radius:12px;height:56px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);box-shadow:inset 0 1px 0 rgba(160,220,255,.08), 0 6px 18px rgba(0,0,0,.4);transition:transform .06s, box-shadow .12s, border-color .12s, background .12s;cursor:pointer;}
+  .ctl.act,.ctl:active{transform:translateY(2px);border-color:var(--cyan);background:linear-gradient(180deg,rgba(38,224,255,.22),rgba(38,224,255,.05));box-shadow:0 0 20px rgba(38,224,255,.4), inset 0 0 12px rgba(38,224,255,.15);}
+  .ctl .stack{display:flex;flex-direction:column;align-items:center;line-height:1;}
+  .ctl .stack span:first-child{font-size:22px;color:var(--cyan);text-shadow:0 0 10px var(--glow);}
+  .ctl .stack span:last-child{font-size:9px;letter-spacing:1px;margin-top:4px;color:var(--muted);}
+  .hint{text-align:center;font-size:11px;color:rgba(120,160,200,.6);letter-spacing:.5px;margin-top:-2px;line-height:1.5;font-family:ui-monospace,Menlo,monospace;}
+  .sound-btn{position:absolute;top:10px;right:10px;z-index:6;width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer;background:var(--glass);border:1px solid var(--glass-line);color:var(--cyan);backdrop-filter:blur(6px);box-shadow:0 0 12px rgba(38,224,255,.25);transition:color .12s,box-shadow .12s;}
+  .sound-btn:active{transform:scale(.92);}
+  .sound-btn.off{color:var(--muted);box-shadow:none;}
+  #welcome-mask{
+    position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 28%,#10243a,#05070f 72%);
+    transition:opacity .45s ease;
+  }
+  #welcome-mask.hide{opacity:0;pointer-events:none;}
+  #welcome-card{text-align:center;padding:0 24px;animation:ggCoverIn .55s ease both;}
+  @keyframes ggCoverIn{from{opacity:0;transform:translateY(22px) scale(.96);}to{opacity:1;transform:none;}}
+  #welcome-logo{
+    font-size:clamp(46px,13vw,88px);font-weight:900;letter-spacing:2px;
+    background:linear-gradient(135deg,#eafcff,#26e0ff,#9b6cff);-webkit-background-clip:text;background-clip:text;
+    color:transparent;filter:drop-shadow(0 4px 26px rgba(38,224,255,.44));margin-bottom:8px;
+  }
+  #welcome-title{font-size:clamp(22px,5.5vw,32px);font-weight:900;color:#eafcff;letter-spacing:3px;margin-bottom:12px;text-shadow:0 0 18px var(--glow);}
+  #welcome-sub{font-size:clamp(13px,3.4vw,16px);color:#8eb2d2;line-height:1.7;max-width:430px;margin:0 auto 22px;}
+  .welcome-demo{display:flex;gap:7px;align-items:flex-end;justify-content:center;height:40px;margin:0 auto 30px;}
+  .welcome-demo span{width:18px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,var(--cyan),var(--violet));box-shadow:0 0 18px rgba(38,224,255,.45);}
+  .welcome-demo span:nth-child(1){height:18px}.welcome-demo span:nth-child(2){height:30px}.welcome-demo span:nth-child(3){height:24px}.welcome-demo span:nth-child(4){height:36px}.welcome-demo span:nth-child(5){height:22px}
+  #welcome-start{
+    border:1px solid var(--cyan);background:linear-gradient(180deg,rgba(38,224,255,.38),rgba(38,224,255,.14));color:#eafcff;
+    font-size:clamp(18px,4.6vw,22px);font-weight:900;letter-spacing:3px;padding:16px 56px;border-radius:999px;cursor:pointer;
+    box-shadow:0 8px 32px rgba(38,224,255,.42),inset 0 0 16px rgba(38,224,255,.18);animation:ggCoverPulse 1.8s ease-in-out infinite;
+  }
+  @keyframes ggCoverPulse{0%,100%{box-shadow:0 8px 32px rgba(38,224,255,.42),inset 0 0 16px rgba(38,224,255,.18);}50%{box-shadow:0 8px 44px rgba(155,108,255,.62),inset 0 0 16px rgba(38,224,255,.25);}}
+</style>
+<style id="touchGuardStyle">
+  html, body, body *{
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-touch-callout:none;
+  }
+  img, svg, canvas{
+    -webkit-user-drag:none;
+    user-drag:none;
+  }
+  input, textarea, [contenteditable="true"]{
+    -webkit-user-select:text;
+    user-select:text;
+    -webkit-touch-callout:default;
+  }
+</style>
+<style id="hubReturnStyle">
+  #hubReturnBtn{
+    position:fixed;
+    left:max(10px, env(safe-area-inset-left));
+    top:max(10px, env(safe-area-inset-top));
+    z-index:2147483000;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:74px;
+    height:34px;
+    padding:0 12px;
+    border-radius:999px;
+    border:1px solid rgba(159,216,255,.48);
+    background:rgba(6,12,24,.74);
+    color:#f3f7ff;
+    box-shadow:0 10px 30px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.12);
+    -webkit-backdrop-filter:blur(12px);
+    backdrop-filter:blur(12px);
+    font:900 13px/1 "PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    letter-spacing:0;
+    text-decoration:none;
+    pointer-events:auto;
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-touch-callout:none;
+    transition:transform .12s ease, border-color .16s ease, background .16s ease;
+  }
+  #hubReturnBtn:active{transform:scale(.96);border-color:rgba(46,230,214,.78);background:rgba(18,34,58,.82)}
+  @media (max-width:640px){#hubReturnBtn{height:30px;min-width:66px;padding:0 9px;font-size:12px}}
+</style>
+</head>
+<body>
+  <div id="welcome-mask">
+    <div id="welcome-card">
+      <div id="welcome-logo">G-Game</div>
+      <div id="welcome-title">沙画方块</div>
+      <div id="welcome-sub">让方块化作沙粒，连通左右两壁完成消除。</div>
+      <div class="welcome-demo"><span></span><span></span><span></span><span></span><span></span></div>
+      <button id="welcome-start" type="button">开始游戏</button>
+    </div>
+  </div>
+
+  <div class="app">
+    <div class="hud">
+      <div class="cell"><div class="label">TIME</div><div class="value" id="time">0:00</div></div>
+      <div class="cell"><div class="label">SCORE</div><div class="value big" id="score">0</div></div>
+      <div class="cell"><div class="label">LEVEL</div><div class="value" id="level">01</div></div>
+    </div>
+
+    <div class="board-area">
+      <canvas id="board"></canvas>
+      <div class="sound-btn" id="sound-btn" title="声音开关">🔊</div>
+      <div class="overlay" id="overlay">
+        <h2 id="ov-title">沙画方块</h2>
+        <p id="ov-sub">方块落下后化作沙子顺势堆积<br>同色沙子连通左右两壁即整片消除</p>
+        <div class="final" id="ov-final"></div>
+        <button class="btn" id="ov-btn">开 始</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="ctl" id="b-left"><div class="stack"><span>◀</span><span>左移</span></div></div>
+      <div class="ctl" id="b-rot"><div class="stack"><span>⟳</span><span>旋转</span></div></div>
+      <div class="ctl" id="b-right"><div class="stack"><span>▶</span><span>右移</span></div></div>
+      <div class="ctl" id="b-down"><div class="stack"><span>▼</span><span>下移</span></div></div>
+      <div class="ctl" id="b-drop"><div class="stack"><span>⤓</span><span>速降</span></div></div>
+    </div>
+    <div class="hint">键盘：← → 移动 · ↑ 旋转 · ↓ 加速下落 · 空格 速降 · P 暂停</div>
+  </div>
+
+  <audio id="bgm" src="bgm.mp3" loop preload="auto"></audio>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- grid / piece config ----------
+  const B = 12;                // 每个方块由 B×B 个沙粒组成（逻辑分辨率，关系到消除手感）
+  const BCOLS = 10, BROWS = 18;
+  const COLS = BCOLS*B, ROWS = BROWS*B;   // 沙粒网格 120 × 216
+  const SIZE = COLS*ROWS;
+  const FALL_BASE = ROWS/270;             // 下落基准速度（与分辨率无关，约 4.3s 落到底）
+
+  // 颜色（沙粒）RGB，索引 1..4 —— 深底发光的霓虹四色
+  const RGB = [null,[255,72,110],[54,230,140],[44,200,255],[255,214,76]];
+
+  const SHAPES = {
+    I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+    O:[[1,1],[1,1]],
+    T:[[0,1,0],[1,1,1],[0,0,0]],
+    S:[[0,1,1],[1,1,0],[0,0,0]],
+    Z:[[1,1,0],[0,1,1],[0,0,0]],
+    J:[[1,0,0],[1,1,1],[0,0,0]],
+    L:[[0,0,1],[1,1,1],[0,0,0]]
+  };
+  const TYPES = Object.keys(SHAPES);
+
+  // ---------- timing ----------
+  const TICK_MS = 16;                       // 一个逻辑步
+  const CLEAR_TICKS = 9;                     // 消除闪光持续步数
+
+  // ---------- canvas ----------
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  let gp = 4, frame = 16, cssW = 0, cssH = 0, ix = 0, iy = 0, iw = 0, ih = 0;
+  let bgCanvas = null;
+
+  // 沙粒离屏画布（网格分辨率），放大绘制
+  const sandCanvas = document.createElement('canvas');
+  sandCanvas.width = COLS; sandCanvas.height = ROWS;
+  const sandCtx = sandCanvas.getContext('2d');
+  const sandImg = sandCtx.createImageData(COLS, ROWS);
+
+  // ---------- audio：背景音乐 + Web Audio 合成音效 ----------
+  const bgm = document.getElementById('bgm');
+  const BGM_VOLUME = 0.38;
+  const SFX_MASTER_VOLUME = 0.58;
+  bgm.volume = BGM_VOLUME;
+  let muted = false;
+  let actx = null, master = null;
+  function audioInit(){
+    if(!actx){
+      try{
+        actx = new (window.AudioContext||window.webkitAudioContext)();
+        master = actx.createGain();
+        master.gain.value = muted ? 0 : SFX_MASTER_VOLUME;
+        master.connect(actx.destination);
+      }catch(e){ actx=null; }
+    }
+    if(actx && actx.state==='suspended') actx.resume();
+  }
+  // 振荡器音：起始/结束频率做滑音
+  function tone(f0, f1, dur, type, vol, delay){
+    if(muted || !actx) return;
+    const t = actx.currentTime + (delay||0);
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type||'square';
+    o.frequency.setValueAtTime(f0, t);
+    if(f1 && f1!==f0) o.frequency.exponentialRampToValueAtTime(Math.max(1,f1), t+dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol||0.18, t+0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g).connect(master);
+    o.start(t); o.stop(t+dur+0.02);
+  }
+  // 噪声音：带滤波扫频，用于沙沙、whoosh
+  function noiseBurst(dur, vol, type, f0, f1){
+    if(muted || !actx) return;
+    const t = actx.currentTime;
+    const n = Math.max(1, Math.floor(actx.sampleRate*dur));
+    const buf = actx.createBuffer(1, n, actx.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<n;i++) d[i] = (Math.random()*2-1)*(1 - i/n);   // 自然衰减
+    const src = actx.createBufferSource(); src.buffer = buf;
+    const flt = actx.createBiquadFilter(); flt.type = type||'bandpass'; flt.Q.value = 0.8;
+    flt.frequency.setValueAtTime(f0||1500, t);
+    if(f1) flt.frequency.exponentialRampToValueAtTime(Math.max(60,f1), t+dur);
+    const g = actx.createGain();
+    g.gain.setValueAtTime(vol||0.2, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    src.connect(flt).connect(g).connect(master);
+    src.start(t); src.stop(t+dur);
+  }
+  const sfx = {
+    move(){ tone(300,300,0.04,'square',0.06); },
+    rotate(){ tone(520,680,0.06,'square',0.09); },
+    land(){ noiseBurst(0.20,0.22,'bandpass',2800,500); tone(180,90,0.12,'sine',0.14); },
+    drop(){ noiseBurst(0.24,0.26,'lowpass',2200,180); tone(240,70,0.18,'triangle',0.18); },
+    clear(){ // 上扬科技和弦
+      tone(523,1046,0.22,'triangle',0.22,0);
+      tone(659,1318,0.24,'sine',0.18,0.04);
+      tone(784,1568,0.28,'sine',0.16,0.09);
+      noiseBurst(0.35,0.16,'highpass',400,5000);
+    },
+    over(){ tone(440,90,0.6,'sawtooth',0.22); tone(220,60,0.7,'square',0.14,0.05); }
+  };
+  function setMuted(m){
+    muted = m;
+    const btn = document.getElementById('sound-btn');
+    btn.textContent = m ? '🔇' : '🔊';
+    btn.classList.toggle('off', m);
+    if(master) master.gain.value = m ? 0 : SFX_MASTER_VOLUME;
+    bgm.muted = m;
+  }
+
+  // ---------- state ----------
+  const grid = new Uint8Array(SIZE);        // 0 空, 1..4 颜色
+  const clearMask = new Uint8Array(SIZE);   // 正在闪光待消除
+  const visited = new Uint8Array(SIZE);
+  const noise = new Int8Array(SIZE);         // 每像素亮度抖动（沙粒质感）
+  const vshade = new Int8Array(ROWS);        // 自上而下的微光影，做出层次感
+  let stack = new Int32Array(SIZE);          // flood fill 栈
+
+  let piece = null, next = null, bag = [];
+  let spawnLaneBag = [], lastSpawnLane = -1;
+  let score = 0, totalCleared = 0, level = 1, elapsed = 0;
+  let fallSpeed = FALL_BASE, fallAccum = 0, softDrop = false;   // 沙粒/逻辑步
+  let clearTimer = 0;
+  let tickAccum = 0, scanDir = false;
+  let playing = false, paused = false, over = false;
+
+  // ================= helpers =================
+  function clamp(v){ return v<0?0:v>255?255:v; }
+  function clone(m){ return m.map(r=>r.slice()); }
+  function rotate(m){
+    const n=m.length, r=Array.from({length:n},()=>new Array(n).fill(0));
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++) r[x][n-1-y]=m[y][x];
+    return r;
+  }
+  function shadeHex(hex,amt){
+    let r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+    return 'rgb('+clamp(r+amt)+','+clamp(g+amt)+','+clamp(b+amt)+')';
+  }
+  for(let i=0;i<SIZE;i++) noise[i] = ((Math.random()*2-1)*8)|0;
+  for(let y=0;y<ROWS;y++) vshade[y] = Math.round((0.45 - y/ROWS)*18);
+
+  // ================= layout / background =================
+  function layout(){
+    const area = document.querySelector('.board-area');
+    const aw = area.clientWidth, ah = area.clientHeight;
+    frame = Math.max(12, Math.round(aw*0.045));
+    const sx = (aw-frame*2)/COLS, sy = (ah-frame*2)/ROWS;
+    gp = Math.max(2, Math.min(sx, sy));        // 沙粒像素尺寸(css，可非整数)
+    iw = gp*COLS; ih = gp*ROWS;
+    cssW = iw+frame*2; cssH = ih+frame*2; ix = frame; iy = frame;
+    canvas.style.width = cssW+'px'; canvas.style.height = cssH+'px';
+    canvas.width = Math.round(cssW*dpr); canvas.height = Math.round(cssH*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    buildBackground();
+    render();
+  }
+
+  function roundRect(g,x,y,w,h,r){
+    g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);
+    g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();
+  }
+  function buildBackground(){
+    bgCanvas = document.createElement('canvas');
+    bgCanvas.width = Math.round(cssW*dpr); bgCanvas.height = Math.round(cssH*dpr);
+    const g = bgCanvas.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
+    const rad=14;
+    // 外框：深色玻璃
+    roundRect(g,0,0,cssW,cssH,rad);
+    const fg=g.createLinearGradient(0,0,0,cssH);
+    fg.addColorStop(0,'#0d1730');fg.addColorStop(1,'#070c1a');
+    g.fillStyle=fg;g.fill();
+    // 外框青色发光描边
+    g.save();
+    g.shadowColor='rgba(38,224,255,.55)';g.shadowBlur=12;
+    g.strokeStyle='rgba(38,224,255,.65)';g.lineWidth=2;
+    roundRect(g,1.5,1.5,cssW-3,cssH-3,rad-1);g.stroke();
+    g.restore();
+
+    // 内场
+    g.save();roundRect(g,ix,iy,iw,ih,8);g.clip();
+    const ig=g.createLinearGradient(0,iy,0,iy+ih);
+    ig.addColorStop(0,'#070b16');ig.addColorStop(1,'#03050c');
+    g.fillStyle=ig;g.fillRect(ix,iy,iw,ih);
+    // 科技网格（按方块尺度）
+    const step=iw/BCOLS;
+    g.strokeStyle='rgba(38,224,255,.08)';g.lineWidth=1;
+    for(let c=0;c<=BCOLS;c++){const x=Math.round(ix+c*step)+0.5;g.beginPath();g.moveTo(x,iy);g.lineTo(x,iy+ih);g.stroke();}
+    for(let y=iy;y<=iy+ih+1;y+=step){const yy=Math.round(y)+0.5;g.beginPath();g.moveTo(ix,yy);g.lineTo(ix+iw,yy);g.stroke();}
+    // 水印
+    g.fillStyle='rgba(38,224,255,.07)';
+    g.font='700 '+Math.max(13,Math.round(iw*0.085))+'px ui-monospace,Menlo,monospace';
+    g.textAlign='center';g.textBaseline='middle';
+    g.fillText('SAND.SYS', ix+iw/2, iy+ih*0.13);
+    g.restore();
+
+    // 内场边线
+    g.strokeStyle='rgba(38,224,255,.22)';g.lineWidth=1.5;roundRect(g,ix+1,iy+1,iw-2,ih-2,7);g.stroke();
+    // 四角准星角标
+    const len=Math.min(iw,ih)*0.055, o=5;
+    g.strokeStyle='rgba(38,224,255,.85)';g.lineWidth=2;
+    g.shadowColor='rgba(38,224,255,.6)';g.shadowBlur=6;
+    bracket(g, ix+o, iy+o, 1, 1, len);
+    bracket(g, ix+iw-o, iy+o, -1, 1, len);
+    bracket(g, ix+o, iy+ih-o, 1, -1, len);
+    bracket(g, ix+iw-o, iy+ih-o, -1, -1, len);
+    g.shadowBlur=0;
+  }
+  function bracket(g,x,y,dx,dy,len){
+    g.beginPath();g.moveTo(x+dx*len,y);g.lineTo(x,y);g.lineTo(x,y+dy*len);g.stroke();
+  }
+
+  // ================= piece =================
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];} return a; }
+  function refillBag(){ bag=shuffle(TYPES.slice()); }
+  function makePiece(){ if(bag.length===0)refillBag(); const t=bag.pop(); return {type:t,mat:clone(SHAPES[t]),color:1+((Math.random()*4)|0)}; }
+  function nextSpawnLane(){
+    if(spawnLaneBag.length===0){
+      spawnLaneBag = shuffle([0,1,2]); // 左 / 中 / 右，洗牌后轮换，避免出生点一直固定
+      if(spawnLaneBag[spawnLaneBag.length-1]===lastSpawnLane && spawnLaneBag.length>1){
+        [spawnLaneBag[spawnLaneBag.length-1], spawnLaneBag[spawnLaneBag.length-2]] = [spawnLaneBag[spawnLaneBag.length-2], spawnLaneBag[spawnLaneBag.length-1]];
+      }
+    }
+    lastSpawnLane = spawnLaneBag.pop();
+    return lastSpawnLane;
+  }
+  function chooseSpawnX(mat){
+    const w = mat[0].length;
+    const maxCol = Math.max(0, BCOLS-w);
+    const lane = nextSpawnLane();
+    const anchors = [0, Math.round(maxCol/2), maxCol];
+    const jitter = maxCol>=2 ? ((Math.random()*3)|0)-1 : 0;
+    const primary = Math.max(0, Math.min(maxCol, anchors[lane]+jitter));
+    const candidates = [primary, anchors[lane]];
+    for(let step=1;step<=maxCol;step++){
+      candidates.push(primary-step, primary+step);
+    }
+    const seen = new Uint8Array(maxCol+1);
+    for(let i=0;i<candidates.length;i++){
+      const col = candidates[i];
+      if(col<0||col>maxCol||seen[col])continue;
+      seen[col]=1;
+      if(!collide(mat, col*B, 0)) return col*B;
+    }
+    return primary*B;
+  }
+  function spawn(){
+    piece = next; next = makePiece();
+    piece.mat = clone(SHAPES[piece.type]);
+    piece.y = 0;
+    piece.x = chooseSpawnX(piece.mat);       // 左 / 中 / 右随机出生，减少静置自动消除
+    fallAccum = 0;
+    if(collide(piece.mat, piece.x, piece.y)) gameOver();
+  }
+  // 遍历方块的每个沙粒（网格坐标）
+  function eachGrain(mat,px,py,cb){
+    for(let r=0;r<mat.length;r++)for(let c=0;c<mat[r].length;c++){
+      if(!mat[r][c])continue;
+      const bx=px+c*B, by=py+r*B;
+      for(let yy=0;yy<B;yy++)for(let xx=0;xx<B;xx++) cb(bx+xx,by+yy);
+    }
+  }
+  function collide(mat,px,py){
+    let hit=false;
+    for(let r=0;r<mat.length && !hit;r++)for(let c=0;c<mat[r].length && !hit;c++){
+      if(!mat[r][c])continue;
+      const bx=px+c*B, by=py+r*B;
+      for(let yy=0;yy<B;yy++){for(let xx=0;xx<B;xx++){
+        const gx=bx+xx, gy=by+yy;
+        if(gx<0||gx>=COLS||gy>=ROWS){hit=true;break;}
+        if(gy>=0 && grid[gy*COLS+gx]!==0){hit=true;break;}
+      } if(hit)break;}
+    }
+    return hit;
+  }
+  function move(d){ if(blocked())return; const nx=piece.x+d*B; if(!collide(piece.mat,nx,piece.y)){ piece.x=nx; sfx.move(); } }
+  function doRotate(){
+    if(blocked()||piece.type==='O')return;
+    const r=rotate(piece.mat);
+    for(const k of [0,-B,B,-2*B,2*B]){ if(!collide(r,piece.x+k,piece.y)){piece.mat=r;piece.x+=k;sfx.rotate();return;} }
+  }
+  function hardDrop(){
+    if(blocked())return;
+    while(!collide(piece.mat,piece.x,piece.y+1)) piece.y++;
+    sfx.drop();
+    lockPiece();
+  }
+  function blocked(){ return !playing||paused||over||!piece; }
+  function lockPiece(){
+    eachGrain(piece.mat,piece.x,piece.y,(gx,gy)=>{ if(gy>=0&&gy<ROWS&&gx>=0&&gx<COLS) grid[gy*COLS+gx]=piece.color; });
+    sfx.land();
+    piece=null;
+    spawn();          // 立即出下一块；落下的沙粒交给物理流动
+  }
+
+  // ================= sand physics =================
+  function physics(){
+    for(let s=0;s<2;s++){            // 多走几步让沙子塌散更顺滑
+      scanDir=!scanDir;
+      for(let y=ROWS-2;y>=0;y--){
+        if(scanDir){ for(let x=0;x<COLS;x++) settle(x,y); }
+        else        { for(let x=COLS-1;x>=0;x--) settle(x,y); }
+      }
+    }
+  }
+  function settle(x,y){
+    const i=y*COLS+x;
+    const c=grid[i];
+    if(c===0||clearMask[i])return;
+    const below=i+COLS;
+    if(grid[below]===0){ grid[below]=c; grid[i]=0; return; }
+    const canL = x>0 && grid[below-1]===0 && grid[i-1]===0;
+    const canR = x<COLS-1 && grid[below+1]===0 && grid[i+1]===0;
+    if(canL&&canR){ if(Math.random()<0.5) grid[below-1]=c; else grid[below+1]=c; grid[i]=0; }
+    else if(canL){ grid[below-1]=c; grid[i]=0; }
+    else if(canR){ grid[below+1]=c; grid[i]=0; }
+  }
+
+  // ================= clear detection (同色连通左右壁) =================
+  function detectClears(){
+    visited.fill(0);
+    let found=0;
+    for(let y=0;y<ROWS;y++){
+      const li=y*COLS;                 // 左壁 x=0
+      const c=grid[li];
+      if(c===0||visited[li])continue;
+      // flood fill 该左壁连通分量
+      let top=0, compStart=top;
+      stack[top++]=li; visited[li]=1;
+      let touchRight=false;
+      const compIdx=[];                // 收集本分量
+      while(compStart<top){
+        const idx=stack[compStart++];
+        compIdx.push(idx);
+        const cx=idx%COLS, cy=(idx/COLS)|0;
+        if(cx===COLS-1) touchRight=true;
+        const L=cx>0, R=cx<COLS-1, U=cy>0, D=cy<ROWS-1;
+        // 八向连通：沙子斜着堆，对角同色也算相连
+        if(L){const n=idx-1; if(!visited[n]&&grid[n]===c){visited[n]=1;stack[top++]=n;}}
+        if(R){const n=idx+1; if(!visited[n]&&grid[n]===c){visited[n]=1;stack[top++]=n;}}
+        if(U){const n=idx-COLS; if(!visited[n]&&grid[n]===c){visited[n]=1;stack[top++]=n;}}
+        if(D){const n=idx+COLS; if(!visited[n]&&grid[n]===c){visited[n]=1;stack[top++]=n;}}
+        if(L&&U){const n=idx-COLS-1; if(!visited[n]&&grid[n]===c){visited[n]=1;stack[top++]=n;}}
+        if(R&&U){const n=idx-COLS+1; if(!visited[n]&&grid[n]===c){visited[n]=1;stack[top++]=n;}}
+        if(L&&D){const n=idx+COLS-1; if(!visited[n]&&grid[n]===c){visited[n]=1;stack[top++]=n;}}
+        if(R&&D){const n=idx+COLS+1; if(!visited[n]&&grid[n]===c){visited[n]=1;stack[top++]=n;}}
+      }
+      if(touchRight){ for(let k=0;k<compIdx.length;k++) clearMask[compIdx[k]]=1; found+=compIdx.length; }
+    }
+    if(found>0){ clearTimer=CLEAR_TICKS; sfx.clear(); }
+  }
+  function applyClear(){
+    let n=0;
+    for(let i=0;i<SIZE;i++){ if(clearMask[i]){ grid[i]=0; clearMask[i]=0; n++; } }
+    if(n>0){
+      score += n; totalCleared += n;
+      level = Math.min(99, Math.floor(score/800)+1);   // 仅作进度显示，不影响下落速度
+      updateHud();
+    }
+    clearTimer=0;
+  }
+
+  // ================= one logical tick =================
+  function tick(){
+    if(over)return;
+    physics();
+    if(piece){
+      const sp = softDrop ? FALL_BASE*9 : fallSpeed;
+      fallAccum += sp;
+      let steps = fallAccum|0; fallAccum -= steps;
+      while(steps-- > 0){
+        if(!collide(piece.mat,piece.x,piece.y+1)) piece.y++;
+        else { lockPiece(); break; }
+      }
+    }
+    if(clearTimer>0){ clearTimer--; if(clearTimer<=0) applyClear(); }
+    else detectClears();
+  }
+
+  // ================= render =================
+  function render(){
+    if(!bgCanvas)return;
+    ctx.clearRect(0,0,cssW,cssH);
+    ctx.drawImage(bgCanvas,0,0,cssW,cssH);
+    // 沙粒 -> imageData
+    const d=sandImg.data;
+    let i=0, p=0;
+    for(let y=0;y<ROWS;y++){
+      const sh=vshade[y];
+      for(let x=0;x<COLS;x++,i++,p+=4){
+        if(clearMask[i]){ d[p]=255;d[p+1]=248;d[p+2]=220;d[p+3]=255; continue; }
+        const c=grid[i];
+        if(c===0){ d[p+3]=0; continue; }
+        const col=RGB[c], n=noise[i]+sh;
+        d[p]=clamp(col[0]+n); d[p+1]=clamp(col[1]+n); d[p+2]=clamp(col[2]+n); d[p+3]=255;
+      }
+    }
+    if(piece && !over){
+      const col=RGB[piece.color];
+      eachGrain(piece.mat,piece.x,piece.y,(gx,gy)=>{
+        if(gx<0||gy<0||gx>=COLS||gy>=ROWS)return;
+        const j=gy*COLS+gx, q=j*4, n=noise[j]+vshade[gy];
+        d[q]=clamp(col[0]+n); d[q+1]=clamp(col[1]+n); d[q+2]=clamp(col[2]+n); d[q+3]=255;
+      });
+    }
+    sandCtx.putImageData(sandImg,0,0);
+    ctx.imageSmoothingEnabled=false;         // 清晰渲染，靠细颗粒去马赛克
+    ctx.drawImage(sandCanvas, ix, iy, iw, ih);
+
+    // 落点虚影
+    if(piece && playing && !paused && !over){
+      let gyP=piece.y; while(!collide(piece.mat,piece.x,gyP+1)) gyP++;
+      if(gyP>piece.y){
+        const col=RGB[piece.color];
+        ctx.save(); ctx.globalAlpha=0.16; ctx.fillStyle='rgb('+col[0]+','+col[1]+','+col[2]+')';
+        for(let r=0;r<piece.mat.length;r++)for(let c=0;c<piece.mat[r].length;c++){
+          if(!piece.mat[r][c])continue;
+          ctx.fillRect(ix+(piece.x+c*B)*gp, iy+(gyP+r*B)*gp, B*gp, B*gp);
+        }
+        ctx.restore();
+      }
+    }
+  }
+
+  // ================= loop =================
+  let lastTime = performance.now();
+  function loop(){
+    const now=performance.now(); let dt=now-lastTime; lastTime=now;
+    if(dt>100)dt=100;
+    if(playing && !paused && !over){
+      elapsed+=dt; tickAccum+=dt;
+      let guard=0;
+      while(tickAccum>=TICK_MS && guard<6){ tickAccum-=TICK_MS; tick(); guard++; }
+    }
+    render(); updateTime();
+  }
+
+  // ================= HUD / overlay =================
+  const elTime=document.getElementById('time'), elScore=document.getElementById('score'), elLevel=document.getElementById('level');
+  let lastTimeStr='';
+  function updateHud(){ elScore.textContent=score; elLevel.textContent=String(level).padStart(2,'0'); }
+  function updateTime(){ const s=Math.floor(elapsed/1000); const str=Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); if(str!==lastTimeStr){elTime.textContent=str;lastTimeStr=str;} }
+
+  const overlay=document.getElementById('overlay'),ovTitle=document.getElementById('ov-title'),ovSub=document.getElementById('ov-sub'),ovFinal=document.getElementById('ov-final'),ovBtn=document.getElementById('ov-btn');
+  function showOverlay(t,sub,fin,btn){ ovTitle.textContent=t; ovSub.innerHTML=sub; ovFinal.textContent=fin||''; ovBtn.textContent=btn; overlay.classList.add('show'); }
+  function hideOverlay(){ overlay.classList.remove('show'); }
+
+  function startGame(){
+    audioInit();
+    if(!muted){ const p=bgm.play(); if(p&&p.catch) p.catch(()=>{}); }
+    grid.fill(0); clearMask.fill(0);
+    bag.length=0; spawnLaneBag.length=0; lastSpawnLane=-1; refillBag(); next=makePiece();
+    score=0; totalCleared=0; level=1; elapsed=0; fallSpeed=FALL_BASE; fallAccum=0; clearTimer=0; tickAccum=0; softDrop=false;
+    over=false; paused=false; playing=true; piece=null;
+    spawn(); updateHud(); lastTimeStr=''; updateTime(); hideOverlay();
+  }
+  function gameOver(){ over=true; playing=false; sfx.over(); showOverlay('游戏结束','沙子堆到顶啦','得分 '+score+' · 等级 '+level,'再来一局'); }
+  function togglePause(){ if(!playing||over)return; paused=!paused; if(paused)showOverlay('已暂停','点击继续游戏','','继续'); else hideOverlay(); }
+  ovBtn.addEventListener('click',()=>{ if(paused){paused=false;hideOverlay();} else startGame(); });
+  document.getElementById('welcome-start').addEventListener('click',()=>{
+    const mask=document.getElementById('welcome-mask');
+    mask.classList.add('hide');
+    setTimeout(()=>mask.remove(),500);
+    startGame();
+  });
+
+  // 声音开关
+  document.getElementById('sound-btn').addEventListener('click',(e)=>{
+    e.stopPropagation();
+    setMuted(!muted);
+    if(!muted){ audioInit(); const p=bgm.play(); if(p&&p.catch) p.catch(()=>{}); }
+  });
+
+  // ================= input =================
+  document.addEventListener('keydown',(e)=>{
+    audioInit();
+    if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();
+    switch(e.key){
+      case 'ArrowLeft': move(-1); break;
+      case 'ArrowRight': move(1); break;
+      case 'ArrowUp': doRotate(); break;
+      case 'ArrowDown': softDrop=true; break;
+      case ' ': hardDrop(); break;
+      case 'p': case 'P': togglePause(); break;
+    }
+  });
+  document.addEventListener('keyup',(e)=>{ if(e.key==='ArrowDown') softDrop=false; });
+
+  function bindButton(id,onDown,onUp,repeat){
+    const el=document.getElementById(id); let t=null,hd=null;
+    const start=(e)=>{ e.preventDefault(); el.classList.add('act'); onDown();
+      if(repeat){ hd=setTimeout(()=>{ t=setInterval(onDown,70); },200); } };
+    const end=()=>{ el.classList.remove('act'); if(hd){clearTimeout(hd);hd=null;} if(t){clearInterval(t);t=null;} if(onUp)onUp(); };
+    el.addEventListener('pointerdown',start);
+    el.addEventListener('pointerup',end);
+    el.addEventListener('pointerleave',end);
+    el.addEventListener('pointercancel',end);
+  }
+  bindButton('b-left', ()=>move(-1), null, true);
+  bindButton('b-right',()=>move(1), null, true);
+  bindButton('b-rot',  ()=>doRotate(), null, false);
+  bindButton('b-down', ()=>{softDrop=true;}, ()=>{softDrop=false;}, false);
+  bindButton('b-drop', ()=>hardDrop(), null, false);
+
+  // 触屏手势
+  let ts=null,swiped=false;
+  canvas.addEventListener('pointerdown',(e)=>{ ts={x:e.clientX,y:e.clientY,t:performance.now(),lx:e.clientX,ly:e.clientY}; swiped=false; });
+  canvas.addEventListener('pointermove',(e)=>{
+    if(!ts)return; const dx=e.clientX-ts.lx, dy=e.clientY-ts.ly; const step=B*gp*0.8;
+    if(Math.abs(dx)>step && Math.abs(dx)>Math.abs(dy)){ move(dx>0?1:-1); ts.lx=e.clientX; swiped=true; }
+    else if(dy>step){ softDrop=true; ts.ly=e.clientY; swiped=true; }
+  });
+  canvas.addEventListener('pointerup',(e)=>{
+    if(!ts)return; const dt=performance.now()-ts.t, tdy=e.clientY-ts.y, tdx=e.clientX-ts.x; softDrop=false;
+    if(!swiped && Math.abs(tdx)<8 && Math.abs(tdy)<8 && dt<250) doRotate();
+    else if(swiped && tdy>B*gp*4 && dt<300) hardDrop();
+    ts=null;
+  });
+
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden && playing && !over && !paused) togglePause(); });
+  window.addEventListener('resize',layout);
+
+  // ================= boot =================
+  function boot(){
+    layout();
+    setInterval(loop, TICK_MS);     // setInterval 保证隐藏时也有同步绘制兜底
+  }
+  boot();
+})();
+</script>
+<script id="touchGuardScript">
+(function(){
+  const allowText = 'input, textarea, [contenteditable="true"]';
+  const isAllowed = target => {
+    const el = target && target.nodeType === 1 ? target : target && target.parentElement;
+    return !!(el && el.closest && el.closest(allowText));
+  };
+  ['selectstart','dragstart','contextmenu'].forEach(type => {
+    document.addEventListener(type, event => {
+      if(!isAllowed(event.target)) event.preventDefault();
+    }, {passive:false});
+  });
+})();
+</script>
+<script id="hubReturnScript">
+(function(){
+  if(document.getElementById('hubReturnBtn')) return;
+  function hubHref(){
+    const url = new URL(location.href);
+    const parts = url.pathname.split('/');
+    const decoded = parts.map(part => {
+      try{return decodeURIComponent(part);}catch(e){return part;}
+    });
+    const markers = ['G-Game-发布版','g-game-hub','写程序'];
+    let pivot = -1;
+    markers.forEach(marker => {
+      const idx = decoded.lastIndexOf(marker);
+      if(idx > pivot) pivot = idx;
+    });
+    if(pivot >= 0){
+      url.pathname = parts.slice(0, pivot + 1).join('/') + '/G-Game/index.html';
+      url.search = '?v=return-hub';
+      url.hash = '';
+      return url.href;
+    }
+    return new URL('../G-Game/index.html?v=return-hub', location.href).href;
+  }
+  function mount(){
+    if(!document.body) return;
+    const link = document.createElement('a');
+    link.id = 'hubReturnBtn';
+    link.href = hubHref();
+    link.target = '_top';
+    link.textContent = '返回大厅';
+    link.setAttribute('aria-label', '返回大厅');
+    document.body.appendChild(link);
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, {once:true});
+  else mount();
+})();
+</script>
+</body>
+</html>

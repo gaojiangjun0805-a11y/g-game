@@ -1,0 +1,6 @@
+Source: /Users/g/Downloads/Meshy_AI_Azure_Sentinel_biped.zip
+Imported files:
+- Meshy_AI_Azure_Sentinel_biped_Animation_Walking_withSkin.glb
+- Meshy_AI_Azure_Sentinel_biped_Animation_Running_withSkin.glb
+Processed by Codex on 2026-06-19.
+Notes: merged walking and running animations into one GLB; compressed the embedded 4096 PNG texture to mobile-friendly baseline JPEG, removed the duplicate emissive texture reference, and kept the normal Meshy model.

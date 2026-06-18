@@ -595,13 +595,14 @@
 <script id="hubReturnScript">
 (function(){
   if(document.getElementById('hubReturnBtn')) return;
+  const PUBLIC_HUB_URL = 'https://gaojiangjun0805-a11y.github.io/g-game/G-Game/index.html?v=return-hub';
   function hubHref(){
     const url = new URL(location.href);
     const parts = url.pathname.split('/');
     const decoded = parts.map(part => {
       try{return decodeURIComponent(part);}catch(e){return part;}
     });
-    const markers = ['G-Game-发布版','g-game-hub','写程序'];
+    const markers = ['G-Game-发布版','g-game','g-game-hub','写程序'];
     let pivot = -1;
     markers.forEach(marker => {
       const idx = decoded.lastIndexOf(marker);
@@ -613,7 +614,7 @@
       url.hash = '';
       return url.href;
     }
-    return new URL('../G-Game/index.html?v=return-hub', location.href).href;
+    return PUBLIC_HUB_URL;
   }
   function mount(){
     if(!document.body) return;

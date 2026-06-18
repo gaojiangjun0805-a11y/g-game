@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>星云穿越</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+<style>
+*{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+:root{ --teal:#54e8d0; }
+html,body{ width:100%; height:100%; overflow:hidden; overscroll-behavior:none; }
+body{
+  min-height:100dvh;
+  background:radial-gradient(ellipse at 18% 12%, #16356b 0%, #0a1330 45%, #05070f 100%);
+  display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+  font-family:'Nunito','Microsoft YaHei',sans-serif; color:#eaf0ff; position:relative;
+  padding:env(safe-area-inset-top,10px) 0 env(safe-area-inset-bottom,8px);
+}
+#bg-canvas{ position:fixed; inset:0; pointer-events:none; z-index:0; }
+#app{ position:relative; z-index:1; width:100%; max-width:520px; display:flex; flex-direction:column;
+  align-items:center; padding:6px 10px 10px; gap:8px; min-height:100dvh; }
+
+/* title */
+#title-wrap{ text-align:center; }
+h1{ font-size:clamp(1.3rem,6.4vw,2rem); font-weight:900; letter-spacing:7px;
+  background:linear-gradient(135deg,#9de2ff,#7aa2ff,#c9b8ff);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 14px #7aa2ff55); }
+#subtitle{ font-size:clamp(0.56rem,2.3vw,0.72rem); color:#8ea2d6; letter-spacing:1.6px; margin-top:3px; }
+
+/* hud */
+#hud{ display:flex; gap:10px; align-items:center; font-size:clamp(0.7rem,2.8vw,0.85rem); color:#aebde8;
+  background:rgba(255,255,255,0.06); padding:6px 15px; border-radius:999px; border:1px solid rgba(255,255,255,0.1); }
+#hud b{ color:#ffe08a; }
+#timer.low{ color:#f87171; animation:tblink 1s steps(2) infinite; }
+@keyframes tblink{ 50%{opacity:.4;} }
+
+/* board */
+#board-wrap{ position:relative; padding:10px; border-radius:18px;
+  background:rgba(10,20,45,0.35); border:1px solid rgba(120,140,200,0.16);
+  box-shadow:0 0 60px #2b5cff22, 0 16px 44px #00000066, inset 0 1px 0 rgba(255,255,255,0.07); }
+#board{ position:relative; }
+#grid-layer{ position:absolute; inset:0; }
+.gcell{ position:absolute; border:1.4px solid rgba(84,232,208,0.45); box-sizing:border-box;
+  box-shadow:inset 0 0 8px rgba(84,232,208,0.06); }
+#planet-layer,#fx-layer{ position:absolute; inset:0; pointer-events:none; }
+#planet-layer{ pointer-events:auto; }
+
+/* planet */
+.planet{ position:absolute; border-radius:50%; cursor:pointer; touch-action:none;
+  transition:box-shadow .15s, filter .15s; overflow:hidden; z-index:10; will-change:left,top,transform; }
+.planet .surface{ position:absolute; inset:0; border-radius:50%; background-size:210% 100%;
+  animation:drift 18s linear infinite; }
+.planet .shade{ position:absolute; inset:0; border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle at 71% 75%, rgba(0,0,0,.62), rgba(0,0,0,.22) 46%, transparent 64%); }
+.planet .rim{ position:absolute; inset:0; border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle at 30% 26%, rgba(255,255,255,.42), transparent 40%),
+            radial-gradient(circle at 80% 82%, var(--glow), transparent 26%); }
+.planet .gloss{ position:absolute; top:9%; left:18%; width:33%; height:26%; border-radius:50%;
+  background:radial-gradient(circle at 42% 42%, rgba(255,255,255,.92), rgba(255,255,255,0) 72%); pointer-events:none; }
+@keyframes drift{ from{background-position:0 50%;} to{background-position:210% 50%;} }
+/* motion trail + wormhole streak */
+.ghost{ position:absolute; border-radius:50%; pointer-events:none; z-index:9; opacity:.5;
+  transition:opacity .32s ease, transform .32s ease; }
+.warp-streak{ position:absolute; height:0; border-radius:4px; pointer-events:none; z-index:55;
+  transform-origin:0 50%; box-shadow:0 0 10px currentColor; animation:streak .34s ease-out forwards; }
+@keyframes streak{ 0%{opacity:.95;} 100%{opacity:0;} }
+.planet.sel{ z-index:30; filter:brightness(1.12); }
+.planet.sel::after{ content:''; position:absolute; inset:-9%; border-radius:50%;
+  border:3px solid #fff; box-shadow:0 0 16px #fff,0 0 26px var(--glow); animation:selRing 1s ease-in-out infinite alternate; }
+@keyframes selRing{ from{opacity:.55;transform:scale(.97);} to{opacity:1;transform:scale(1.04);} }
+.planet.pulse{ animation:pPulse .32s ease; }
+@keyframes pPulse{ 40%{ transform:scale(1.16); filter:brightness(1.5);} }
+.planet.pop{ animation:pPop .42s cubic-bezier(.3,1.4,.6,1) forwards; }
+@keyframes pPop{ 35%{ transform:scale(1.32); filter:brightness(1.8);} 100%{ transform:scale(0); opacity:0;} }
+.planet.shake{ animation:pShake .32s; }
+@keyframes pShake{ 0%,100%{} 20%{transform:translateX(-4px)} 40%{transform:translateX(4px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)} }
+
+/* direction arrows */
+.arrow{ position:absolute; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  border-radius:50%; font-weight:900; z-index:40; pointer-events:auto; touch-action:manipulation;
+  transition:transform .12s; animation:arrFloat 1s ease-in-out infinite alternate; }
+.arrow:active{ transform:scale(.86); }
+.arrow svg{ width:62%; height:62%; }
+@keyframes arrFloat{ from{filter:drop-shadow(0 0 4px currentColor);} to{filter:drop-shadow(0 0 12px currentColor);} }
+/* destination ring (where the ball ends up) */
+.dest{ position:absolute; border-radius:50%; border:2.5px dashed currentColor; pointer-events:none; z-index:34;
+  animation:destPulse .9s ease-in-out infinite alternate; }
+@keyframes destPulse{ from{ transform:scale(.9); opacity:.5;} to{ transform:scale(1.03); opacity:.95;} }
+/* wormhole flash on a portal planet */
+.planet.warp{ animation:warp .34s ease; }
+@keyframes warp{ 35%{ transform:scale(1.2); filter:brightness(1.8) saturate(1.6);} }
+/* swipe-gesture hint (a finger touch-point that slides in the suggested direction) */
+.swipe-hint{ position:absolute; z-index:47; pointer-events:none; border-radius:50%;
+  background:radial-gradient(circle at 38% 32%, rgba(255,255,255,.98), rgba(255,255,255,.55) 55%, rgba(255,255,255,0) 73%);
+  box-shadow:0 0 16px rgba(255,255,255,.85), 0 0 30px #9de2ffaa;
+  animation:swipeG 1.7s cubic-bezier(.5,0,.25,1) infinite; }
+.swipe-hint::after{ content:'👆'; position:absolute; left:50%; top:56%; transform:translate(-50%,-50%); font-size:60%; filter:drop-shadow(0 1px 2px #000a); }
+@keyframes swipeG{
+  0%{ transform:translate(0,0) scale(.6); opacity:0; }
+  14%{ transform:translate(0,0) scale(1); opacity:1; }
+  55%{ transform:translate(var(--dx,0),var(--dy,0)) scale(1); opacity:1; }
+  80%{ transform:translate(var(--dx,0),var(--dy,0)) scale(.7); opacity:0; }
+  100%{ opacity:0; } }
+
+/* fx */
+.spark{ position:fixed; pointer-events:none; z-index:600; border-radius:50%;
+  animation:sparkFly var(--dur,.7s) ease-out forwards; }
+@keyframes sparkFly{ 0%{transform:translate(0,0) scale(1);opacity:1;} 100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0;} }
+
+/* buttons */
+#buttons{ display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+button{ padding:9px 15px; border:none; border-radius:999px; font-size:clamp(0.72rem,3vw,0.82rem);
+  cursor:pointer; font-family:inherit; font-weight:800; letter-spacing:.5px;
+  transition:all .14s cubic-bezier(.34,1.56,.64,1); box-shadow:0 3px 12px #0004; touch-action:manipulation; }
+button:active{ transform:scale(.93); }
+button:disabled{ opacity:.32; pointer-events:none; }
+#btn-new{ background:linear-gradient(135deg,#60a5fa,#3b6aed); color:#fff; }
+#btn-undo{ background:linear-gradient(135deg,#94a3b8,#64748b); color:#fff; }
+#btn-reset{ background:linear-gradient(135deg,#64748b,#475569); color:#fff; }
+#btn-hint{ background:linear-gradient(135deg,#ffe08a,#f59e0b); color:#1a1a2e; }
+#btn-music{ background:linear-gradient(135deg,#a78bfa,#7c3aed); color:#fff; }
+#msg{ min-height:1.2rem; font-size:clamp(0.74rem,3vw,0.9rem); font-weight:800; color:#ffe08a;
+  letter-spacing:.6px; text-align:center; text-shadow:0 0 10px #ffe08a66; padding:0 8px; }
+
+/* settlement */
+#settle-mask{ position:fixed; inset:0; background:rgba(4,6,20,0.85); display:none; align-items:center;
+  justify-content:center; z-index:1000; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+#settle-mask.show{ display:flex; animation:fadeIn .35s ease; }
+@keyframes fadeIn{ from{opacity:0;} to{opacity:1;} }
+#settle-card{ width:90%; max-width:420px; background:linear-gradient(160deg,#15224a,#0d1430);
+  border:2px solid #7aa2ff; border-radius:28px; padding:30px 24px 22px; text-align:center;
+  box-shadow:0 0 70px #3b6aed66,0 24px 70px #000b; animation:cardPop .5s cubic-bezier(.34,1.56,.64,1); }
+@keyframes cardPop{ from{transform:scale(.6) translateY(30px);opacity:0;} to{transform:scale(1);opacity:1;} }
+#settle-title{ font-size:1.8rem; font-weight:900; letter-spacing:3px; margin-bottom:2px;
+  background:linear-gradient(135deg,#ffe08a,#fb923c,#c9b8ff); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+#settle-sub{ font-size:.78rem; color:#8ea2d6; margin-bottom:12px; letter-spacing:1px; }
+#settle-rank{ font-size:5rem; font-weight:900; line-height:1; margin:4px 0; filter:drop-shadow(0 0 24px currentColor); }
+.settle-row{ display:flex; justify-content:space-between; font-size:.82rem; color:#aebde8; padding:5px 4px; border-bottom:1px dashed rgba(122,162,255,.18); }
+.settle-row span:last-child{ color:#ffe08a; font-weight:900; }
+.settle-total{ display:flex; justify-content:space-between; margin-top:10px; padding:10px 6px;
+  background:rgba(255,224,138,.1); border-radius:14px; border:1px solid #ffe08a44; }
+.settle-total span:first-child{ font-weight:900; color:#fff; }
+.settle-total span:last-child{ font-size:1.6rem; font-weight:900; color:#ffe08a; }
+#settle-btns{ display:flex; gap:8px; margin-top:16px; }
+#settle-btns button{ flex:1; padding:11px 0; }
+#sb-again{ background:linear-gradient(135deg,#4ade80,#16a34a); color:#04210f; }
+#sb-next{ background:linear-gradient(135deg,#ffe08a,#f59e0b); color:#1a1a2e; }
+
+/* welcome */
+#welcome-mask{ position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 28%,#16224d,#070b1a 70%); transition:opacity .5s ease; }
+#welcome-mask.hide{ opacity:0; pointer-events:none; }
+#welcome-card{ text-align:center; padding:0 24px; max-width:460px; animation:wcIn .6s ease both; }
+@keyframes wcIn{ from{opacity:0;transform:translateY(24px) scale(.96);} to{opacity:1;transform:none;} }
+#welcome-logo{ font-size:clamp(40px,12vw,80px); font-weight:900; letter-spacing:3px;
+  background:linear-gradient(135deg,#9de2ff,#60a5fa,#c9b8ff); -webkit-background-clip:text; background-clip:text;
+  color:transparent; filter:drop-shadow(0 4px 24px rgba(96,165,250,.4)); margin-bottom:8px; }
+#welcome-sub{ font-size:clamp(13px,3.4vw,15.5px); color:#9aa6d6; line-height:1.8; margin:0 auto 26px; }
+#welcome-sub b{ color:#9de2ff; }
+#welcome-start{ font-size:clamp(18px,4.6vw,22px); font-weight:900; color:#08142a; cursor:pointer; border:none;
+  padding:15px 52px; border-radius:999px; background:linear-gradient(135deg,#9de2ff,#3b82f6);
+  box-shadow:0 8px 32px rgba(59,130,246,.5); animation:wcPulse 1.8s ease-in-out infinite; }
+@keyframes wcPulse{ 0%,100%{box-shadow:0 8px 32px rgba(59,130,246,.5);} 50%{box-shadow:0 8px 44px rgba(59,130,246,.85);} }
+</style>
+<style id="touchGuardStyle">
+  html, body, body *{
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-touch-callout:none;
+  }
+  img, svg, canvas{
+    -webkit-user-drag:none;
+    user-drag:none;
+  }
+  input, textarea, [contenteditable="true"]{
+    -webkit-user-select:text;
+    user-select:text;
+    -webkit-touch-callout:default;
+  }
+</style>
+<style id="hubReturnStyle">
+  #hubReturnBtn{
+    position:fixed;
+    left:max(10px, env(safe-area-inset-left));
+    top:max(10px, env(safe-area-inset-top));
+    z-index:2147483000;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:74px;
+    height:34px;
+    padding:0 12px;
+    border-radius:999px;
+    border:1px solid rgba(159,216,255,.48);
+    background:rgba(6,12,24,.74);
+    color:#f3f7ff;
+    box-shadow:0 10px 30px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.12);
+    -webkit-backdrop-filter:blur(12px);
+    backdrop-filter:blur(12px);
+    font:900 13px/1 "PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    letter-spacing:0;
+    text-decoration:none;
+    pointer-events:auto;
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-touch-callout:none;
+    transition:transform .12s ease, border-color .16s ease, background .16s ease;
+  }
+  #hubReturnBtn:active{transform:scale(.96);border-color:rgba(46,230,214,.78);background:rgba(18,34,58,.82)}
+  @media (max-width:640px){#hubReturnBtn{height:30px;min-width:66px;padding:0 9px;font-size:12px}}
+</style>
+</head>
+<body>
+<div id="welcome-mask">
+  <div id="welcome-card">
+    <div id="welcome-logo">星云穿越</div>
+    <div id="welcome-sub">
+      点选一颗星球，再点方向箭头让它出发。<br>
+      撞上<b>异色星球</b>会从它的<b>同色伙伴</b>处穿出来（星际虫洞）；<br>
+      撞上<b>自己的同色伙伴</b>则两颗相撞消失。<br>
+      虚线圈是落点提示，把所有星球清空即获胜 ✨
+    </div>
+    <button id="welcome-start">开始穿越</button>
+  </div>
+</div>
+
+<canvas id="bg-canvas"></canvas>
+
+<div id="app">
+  <div id="title-wrap">
+    <h1>星 云 穿 越</h1>
+    <div id="subtitle">穿越异色 · 同色相消 · 清空星海</div>
+  </div>
+
+  <div id="hud">
+    🚀 第 <b id="level">1</b> 关 &nbsp;·&nbsp;
+    👆 <b id="moves">0</b> &nbsp;·&nbsp;
+    🪐 <b id="pairs">0</b> &nbsp;·&nbsp;
+    ⏱ <b id="timer">0</b>s
+  </div>
+
+  <div id="board-wrap">
+    <div id="board">
+      <div id="grid-layer"></div>
+      <div id="planet-layer"></div>
+      <div id="fx-layer"></div>
+    </div>
+  </div>
+
+  <div id="buttons">
+    <button id="btn-new">🔄 换一题</button>
+    <button id="btn-undo">↶ 撤销</button>
+    <button id="btn-reset">↺ 重置</button>
+    <button id="btn-hint">💡 提示</button>
+    <button id="btn-music">🔇 关音乐</button>
+  </div>
+
+  <div id="msg"></div>
+</div>
+
+<div id="settle-mask">
+  <div id="settle-card">
+    <div id="settle-title">星海清空</div>
+    <div id="settle-sub"></div>
+    <div id="settle-rank">S</div>
+    <div id="settle-rows"></div>
+    <div class="settle-total"><span>⭐ 总分</span><span id="settle-total-val">0</span></div>
+    <div id="settle-btns">
+      <button id="sb-again">🔄 重玩本关</button>
+      <button id="sb-next">⬆ 下一关</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  星云穿越 — Nebula Crossing
+// ════════════════════════════════════════════════════════════
+
+// ── palette ─────────────────────────────────────────────────
+const PAL=[
+  {hi:'#d8bcff',mid:'#9a55f2',lo:'#591f9c',glow:'#a368ff'}, // purple
+  {hi:'#ffd6a0',mid:'#ff9b32',lo:'#bc530c',glow:'#ff9b32'}, // orange
+  {hi:'#ff9c80',mid:'#ef4636',lo:'#971c14',glow:'#ef4636'}, // red
+  {hi:'#ffb0e4',mid:'#ff36ab',lo:'#9c1262',glow:'#ff36ab'}, // magenta
+  {hi:'#c6f1a4',mid:'#67d348',lo:'#2c8526',glow:'#67d348'}, // green
+  {hi:'#a6d7ff',mid:'#3a90ff',lo:'#114e9c',glow:'#3a90ff'}, // blue
+  {hi:'#aef7f1',mid:'#27d2cc',lo:'#117773',glow:'#27d2cc'}, // cyan
+  {hi:'#fff0a6',mid:'#ffce36',lo:'#b3820a',glow:'#ffce36'}, // yellow
+  {hi:'#ffd0b0',mid:'#d2691e',lo:'#7a3a0a',glow:'#e07b2a'}, // amber/brown
+  {hi:'#e8b8ff',mid:'#c44fef',lo:'#6b1d8a',glow:'#c44fef'}, // violet
+];
+function planetBG(ci){ const p=PAL[ci]; return `radial-gradient(circle at 33% 28%, ${p.hi}, ${p.mid} 48%, ${p.lo} 96%)`; }
+function planetSurface(ci){ const p=PAL[ci]; const a=88+((ci*47)%34);
+  return `radial-gradient(circle at 24% 62%, ${p.hi}66, transparent 24%),`
+        +`radial-gradient(circle at 72% 34%, ${p.hi}4d, transparent 20%),`
+        +`radial-gradient(circle at 56% 82%, ${p.lo}80, transparent 26%),`
+        +`repeating-linear-gradient(${a}deg, ${p.lo}59 0 8%, ${p.mid}33 8% 15%, ${p.hi}26 15% 23%),`
+        +`linear-gradient(150deg, ${p.hi}, ${p.mid} 46%, ${p.lo})`; }
+
+// ── level system ────────────────────────────────────────────
+const DIRS=[{dr:-1,dc:0},{dr:1,dc:0},{dr:0,dc:-1},{dr:0,dc:1}];
+function levelConfig(n){
+  // board grows, pairs grow, and the spread (how scattered planets are) grows
+  const R=Math.min(8, 4+Math.ceil(n/3));                 // L1-3:5, 4-6:6, 7-9:7, 10+:8
+  const pairs=Math.min(1+Math.ceil(n/2), R+2, 8);        // 2,2,3,3,4,4,5,5,6,6,7,7,8...
+  const landing=n<=5;                                    // landing rings: tutorial only
+  const spread=Math.min(0.5, (n-1)*0.06);                // mild visual scatter
+  const hard=n>5;                                         // L6+: must-reposition (perturb+verify) puzzles
+  const time=Math.round((24+pairs*30+R*5)*(n<=5?1.7:1.2));
+  const base=500+pairs*340+n*30;
+  const tr=Math.max(5, 11-((n/3)|0));
+  return {R, C:R, pairs, landing, spread, hard, time, base, tr};
+}
+
+// ── state ───────────────────────────────────────────────────
+let level=1, cfg=levelConfig(1), R=5, C=5, landingHints=true;
+let grid=[];                 // cell -> color index or -1
+let startGrid=[];            // for reset
+let planetEls={};            // cell -> element
+let sel=-1, animating=false, moves=0, capturedPairs=0, totalPairs=0;
+let levelSolution=null, par=0;   // stored solution (list of {cell,d}) + par move count
+let history=[];              // snapshots for undo
+let timeLeft=0, timerID=null, won=false, started=false, hintUsed=false;
+let cell=46, gap=0, pad=10;
+
+const $=id=>document.getElementById(id);
+const boardEl=$('board'), gridLayer=$('grid-layer'), planetLayer=$('planet-layer'), fxLayer=$('fx-layer');
+const movesEl=$('moves'), pairsEl=$('pairs'), timerEl=$('timer'), msgEl=$('msg');
+
+const inb=(r,c)=>r>=0&&r<R&&c>=0&&c<C;
+const RC=cell=>[ (cell/C)|0, cell%C ];
+const ID=(r,c)=>r*C+c;
+
+// the other planet sharing this cell's color (its wormhole partner)
+function partner(g,cellId){ const col=g[cellId];
+  for(let i=0;i<g.length;i++) if(i!==cellId && g[i]===col) return i; return -1; }
+
+// ════════════════════════════════════════════════════════════
+//  rules: simulate moving the ball at `cell` in direction d
+//   - hits a DIFFERENT planet -> wormhole: exit one cell past its partner, keep going
+//   - hits its SAME color      -> collision (both vanish)
+//   - lands on empty           -> reposition (rest there)
+//   - off-board / loops         -> illegal
+//  type: 'illegal' | 'collision'(partner) | 'reposition'(to). hops = animation path.
+// ════════════════════════════════════════════════════════════
+function simulate(g,cellId,d){
+  const t=g[cellId];
+  let [r,c]=RC(cellId);
+  let er=r+d.dr, ec=c+d.dc;
+  let fromCell=cellId;
+  const hops=[], seen=new Set();
+  while(true){
+    if(!inb(er,ec)) return {type:'illegal'};
+    const enter=ID(er,ec);
+    if(enter===cellId || g[enter]<0) return {type:'illegal'};   // origin is vacated; nothing to enter
+    if(g[enter]===t){                                     // reached own color -> collide
+      hops.push({from:fromCell,enter,land:enter,portal:false});
+      return {type:'collision', partner:enter, hops};
+    }
+    if(seen.has(enter)) return {type:'illegal'};          // wormhole loop guard
+    seen.add(enter);
+    const Y=partner(g,enter); if(Y<0) return {type:'illegal'};
+    const [yr,yc]=RC(Y); const lr=yr+d.dr, lc=yc+d.dc;
+    if(!inb(lr,lc)) return {type:'illegal'};              // exit would be off-board
+    const land=ID(lr,lc);
+    hops.push({from:fromCell,enter,exitPlanet:Y,land,portal:true});
+    if(land===cellId) return {type:'illegal'};            // wormhole looped back to the start -> no move
+    if(g[land]<0) return {type:'reposition', to:land, hops};
+    fromCell=land; er=lr; ec=lc;                          // landed on a planet -> keep crossing
+  }
+}
+function listMoves(g){
+  const mv=[];
+  for(let i=0;i<g.length;i++){ if(g[i]<0) continue;
+    for(const d of DIRS){ const o=simulate(g,i,d); if(o.type!=='illegal') mv.push({cell:i,d,o}); } }
+  return mv;
+}
+function listCollisions(g){
+  const mv=[];
+  for(let i=0;i<g.length;i++){ if(g[i]<0) continue;
+    for(const d of DIRS){ const o=simulate(g,i,d); if(o.type==='collision') mv.push({cell:i,d,o}); } }
+  return mv;
+}
+
+// ════════════════════════════════════════════════════════════
+//  level generation — reverse construction (always solvable)
+//  Add pairs in reverse of their solve order. Each pair is placed so that
+//  moving one of its balls collides with the other:
+//    - 1st pair / fallback: the two balls adjacent (direct collision)
+//    - otherwise: ball at S, dir d, wormholes through ALREADY-placed planets
+//      and lands on an empty cell E -> put the partner there (a real "穿越" kill)
+//  Solving in reverse-add order is then always valid.
+// ════════════════════════════════════════════════════════════
+function placePair(g,colorIdx){
+  const empties=[]; for(let i=0;i<g.length;i++) if(g[i]<0) empties.push(i);
+  const adj=[], portal=[];                                  // candidates: {s,e,d,hops}
+  for(const s of empties){ const [r,c]=RC(s);
+    for(const d of DIRS){ const nr=r+d.dr, nc=c+d.dc; if(!inb(nr,nc)) continue;
+      const first=ID(nr,nc);
+      if(g[first]<0){ if(first>s) adj.push({s,e:first,d,hops:0}); }   // adjacent empty pair: move s -> first collides
+      else {                                                   // wormhole chain off an existing planet
+        g[s]=colorIdx; const o=simulate(g,s,d); g[s]=-1;
+        if(o.type==='reposition' && o.to!==s && g[o.to]<0) portal.push({s,e:o.to,d,hops:o.hops.length});
+      }
+    }
+  }
+  const spread=(typeof cfg!=='undefined' && cfg.spread)||0, chain=(typeof cfg!=='undefined' && cfg.chain);
+  let pool;
+  if(colorIdx===0) pool=adj;                              // first pair seeds the structure (adjacent)
+  else if(portal.length) pool=portal;                     // every later pair connects via a wormhole
+  else pool = adj;                                         // (rare) fallback; isolated pairs get rejected below
+  if(!pool || !pool.length) return null;
+  // chain bias (L8+): prefer multi-wormhole kills, so balls don't all clear in a single hop
+  if(chain && pool===portal){ const multi=portal.filter(p=>p.hops>=2); if(multi.length && Math.random()<0.85) pool=multi; }
+  // spread bias: on later levels, prefer placements far from existing planets (scatter)
+  let pick;
+  if(spread>0 && colorIdx>0 && Math.random()<spread){
+    const occ=[]; for(let i=0;i<g.length;i++) if(g[i]>=0) occ.push(i);
+    let best=null, bestSc=-1;
+    for(const cand of pool){ let sc=0;
+      for(const cc of [cand.s,cand.e]){ let md=99; const [r1,c1]=RC(cc);
+        for(const o of occ){ const [r2,c2]=RC(o); md=Math.min(md,Math.abs(r1-r2)+Math.abs(c1-c2)); } sc+=md; }
+      if(sc>bestSc){ bestSc=sc; best=cand; } }
+    pick=best;
+  }
+  if(!pick) pick=pool[(Math.random()*pool.length)|0];
+  const {s,e,d,hops}=pick;
+  if(s===e || g[s]>=0 || g[e]>=0) return null;
+  g[s]=colorIdx; g[e]=colorIdx;
+  return {cell:s, d, hops:hops||0};                       // the kill move: move s in dir d -> collides at e
+}
+// a pair is "isolated/meaningless" if neither of its balls touches a DIFFERENT color
+// (nothing can wormhole through it and it can't reach anything — just a free trivial kill)
+function hasIsolatedPair(g){
+  const byColor={};
+  for(let i=0;i<g.length;i++){ if(g[i]<0) continue; (byColor[g[i]]=byColor[g[i]]||[]).push(i); }
+  for(const col in byColor){
+    let touches=false;
+    for(const cell of byColor[col]){ const [r,c]=RC(cell);
+      for(const d of DIRS){ const nr=r+d.dr,nc=c+d.dc; if(!inb(nr,nc)) continue;
+        const n=ID(nr,nc); if(g[n]>=0 && g[n]!=col){ touches=true; break; } }
+      if(touches) break; }
+    if(!touches) return true;
+  }
+  return false;
+}
+function genLevel(){
+  for(let attempt=0;attempt<500;attempt++){
+    const g=new Array(R*C).fill(-1);
+    const placements=[]; let ok=true;
+    for(let i=0;i<cfg.pairs;i++){ const mv=placePair(g,i); if(!mv){ ok=false; break; } placements.push(mv); }
+    if(ok && g.filter(x=>x>=0).length===cfg.pairs*2 && !hasIsolatedPair(g))
+      return {grid:g, solution:placements.reverse()};
+  }
+  return null;
+}
+// ── hard levels (L6+): clustered boards that REQUIRE repositioning ──
+// Take a guaranteed-solvable board, displace a couple of balls so collisions no longer line
+// up (you must slide balls around to set them up), then verify it's still solvable with a
+// bounded solver and keep that solution for hints. This is the "loose cluster" style.
+function perturbBoard(g0, D){
+  const g=g0.slice();
+  for(let d=0; d<D; d++){
+    const balls=[], emp=[];
+    for(let i=0;i<g.length;i++){ if(g[i]>=0){ balls.push(i); continue; }
+      const [r,c]=RC(i);                                   // only empty cells touching the cluster
+      if(DIRS.some(dd=>{const nr=r+dd.dr,nc=c+dd.dc; return inb(nr,nc)&&g[nr*C+nc]>=0;})) emp.push(i); }
+    if(!balls.length || !emp.length) break;
+    const b=balls[(Math.random()*balls.length)|0], e=emp[(Math.random()*emp.length)|0];
+    g[e]=g[b]; g[b]=-1;
+  }
+  return g;
+}
+function captureOnlySolvable(g0){          // collision-only state space is tiny -> complete & fast
+  let found=false, n=0;
+  (function dfs(g){ if(found||n>200000) return; if(g.every(x=>x<0)){found=true;return;} n++;
+    for(const m of listCollisions(g)){ dfs(applyTo(g,m)); if(found) return; } })(g0.slice());
+  return found;
+}
+function solveBounded(g0, maxRepos, cap, ms){  // captures-first DFS, <=maxRepos repositions, visited-pruned
+  const vis=new Map(); let best=null, nodes=0; const t0=Date.now();
+  (function dfs(g, repos, path){
+    if(best || nodes>cap || Date.now()-t0>ms) return;
+    if(g.every(x=>x<0)){ best=path.slice(); return; }
+    nodes++; const k=g.join(','); const p=vis.get(k); if(p!==undefined && p<=repos) return; vis.set(k,repos);
+    const mv=listMoves(g);
+    for(const m of mv){ if(m.o.type==='collision'){ path.push(m); dfs(applyTo(g,m),repos,path); path.pop(); if(best) return; } }
+    if(repos<maxRepos) for(const m of mv){ if(m.o.type==='reposition'){ path.push(m); dfs(applyTo(g,m),repos+1,path); path.pop(); if(best) return; } }
+  })(g0.slice(),0,[]);
+  return best;
+}
+function genHardLevel(){
+  const t0=performance.now(); let fallback=null;
+  for(let t=0; t<26 && performance.now()-t0<2600; t++){
+    const base=genLevel(); if(!base) continue;
+    if(!fallback) fallback=base;                            // a guaranteed-solvable board to fall back on
+    const g=perturbBoard(base.grid, 2);
+    if(g.filter(x=>x>=0).length!==cfg.pairs*2) continue;
+    if(captureOnlySolvable(g)) continue;                    // too easy — no repositioning needed
+    const sol=solveBounded(g, 5, 120000, 1000);             // verified solvable within <=5 repositions
+    if(sol) return {grid:g, solution:sol.map(m=>({cell:m.cell,d:m.d}))};
+  }
+  return fallback;                                          // couldn't craft a hard one in budget
+}
+
+// ════════════════════════════════════════════════════════════
+//  live solver (for hints) — bounded DFS, captures first
+// ════════════════════════════════════════════════════════════
+function applyTo(g,m){
+  const ng=g.slice(); const color=ng[m.cell]; ng[m.cell]=-1;
+  if(m.o.type==='collision') ng[m.o.partner]=-1; else ng[m.o.to]=color;
+  return ng;
+}
+// collisions-only: each removes a pair, so depth = pairs, no cycles -> tiny tree.
+// Every generated board solves this way (that's how it was built).
+function solveCaptures(g0){
+  let firstMove=null, nodes=0; const CAP=300000;
+  function dfs(g,first){
+    if(g.every(x=>x<0)){ firstMove=first; return true; }
+    if(++nodes>CAP) return false;
+    for(const m of listCollisions(g)){ const f=first||m; if(dfs(applyTo(g,m),f)) return true; }
+    return false;
+  }
+  return dfs(g0.slice(),null)? firstMove : null;
+}
+// fallback that also allows a few repositions (only needed after the player deviates)
+function solveFull(g0){
+  const planets=g0.filter(x=>x>=0).length, maxDepth=(planets>>1)+6;
+  const onPath=new Set(); let nodes=0; const CAP=120000; let firstMove=null;
+  function dfs(g,depth,first){
+    if(g.every(x=>x<0)){ firstMove=first; return true; }
+    if(depth>=maxDepth || ++nodes>CAP) return false;
+    const k=g.join(','); if(onPath.has(k)) return false; onPath.add(k);
+    const mv=listMoves(g);
+    mv.sort((x,y)=>(x.o.type==='collision'?0:1)-(y.o.type==='collision'?0:1));
+    for(const m of mv){ const f=first||m; if(dfs(applyTo(g,m),depth+1,f)){ onPath.delete(k); return true; } }
+    onPath.delete(k); return false;
+  }
+  return dfs(g0.slice(),0,null)? firstMove : null;
+}
+function solveFirst(g0){ return solveCaptures(g0) || solveFull(g0); }
+
+// ════════════════════════════════════════════════════════════
+//  layout & render
+// ════════════════════════════════════════════════════════════
+function computeCell(){
+  const vw=Math.min(window.innerWidth,520);
+  const availW=vw-40;                                  // app + board-wrap padding
+  const availH=Math.max(150, window.innerHeight-300);  // reserve room for header/buttons
+  cell=Math.max(26, Math.min(Math.floor(availW/C), Math.floor(availH/R)));
+  boardEl.style.width=(cell*C)+'px'; boardEl.style.height=(cell*R)+'px';
+}
+function buildGrid(){
+  gridLayer.innerHTML='';
+  for(let r=0;r<R;r++) for(let c=0;c<C;c++){
+    const d=document.createElement('div'); d.className='gcell';
+    d.style.left=(c*cell)+'px'; d.style.top=(r*cell)+'px';
+    d.style.width=cell+'px'; d.style.height=cell+'px';
+    gridLayer.appendChild(d);
+  }
+}
+function planetSize(){ return Math.round(cell*0.82); }
+function placeEl(el,cellId){
+  const [r,c]=RC(cellId); const s=planetSize(); const off=(cell-s)/2;
+  el.style.left=(c*cell+off)+'px'; el.style.top=(r*cell+off)+'px';
+}
+function makePlanet(cellId,ci){
+  const el=document.createElement('div'); el.className='planet'; el.dataset.cell=cellId; el.dataset.color=ci;
+  const s=planetSize();
+  el.style.width=s+'px'; el.style.height=s+'px';
+  el.style.background=planetBG(ci);
+  el.style.setProperty('--glow',PAL[ci].glow);
+  el.style.boxShadow=`0 0 ${Math.round(cell*0.22)}px ${PAL[ci].glow}aa, 0 0 0 1px rgba(255,255,255,.08), inset -3px -5px 10px rgba(0,0,0,.5), inset 3px 4px 8px rgba(255,255,255,.28)`;
+  const surf=document.createElement('div'); surf.className='surface';
+  surf.style.background=planetSurface(ci); surf.style.animationDelay=(-(ci*2.3))+'s';
+  el.appendChild(surf);
+  el.insertAdjacentHTML('beforeend','<div class="shade"></div><div class="rim"></div><div class="gloss"></div>');
+  placeEl(el,cellId);
+  attachGesture(el,cellId);
+  return el;
+}
+function rebuildPlanets(){
+  planetLayer.innerHTML=''; planetEls={};
+  for(let i=0;i<grid.length;i++){ if(grid[i]>=0){ const el=makePlanet(i,grid[i]); planetLayer.appendChild(el); planetEls[i]=el; } }
+}
+function layout(){ computeCell(); buildGrid(); for(const k in planetEls){ const el=planetEls[k]; const s=planetSize();
+  el.style.width=s+'px'; el.style.height=s+'px'; placeEl(el,+k); } clearArrows(); clearSwipeHint(); }
+
+// ── landing rings (where each swipe would land) — tutorial / hint preview ──
+function clearArrows(){ fxLayer.querySelectorAll('.dest').forEach(a=>a.remove()); }
+function showLandingRings(cellId){
+  clearArrows();
+  for(const d of DIRS){
+    const o=simulate(grid,cellId,d); if(o.type==='illegal') continue;
+    const isCap=o.type==='collision', col=isCap?'#34d36b':'#5fd0ff';
+    const destCell=isCap? o.partner : o.to;
+    const [r2,c2]=RC(destCell); const ds=Math.round(cell*0.94);
+    const dm=document.createElement('div'); dm.className='dest'; dm.dataset.dir=d.dr+','+d.dc;
+    dm.style.width=ds+'px'; dm.style.height=ds+'px';
+    dm.style.left=(c2*cell+(cell-ds)/2)+'px'; dm.style.top=(r2*cell+(cell-ds)/2)+'px';
+    dm.style.color=col; dm.style.borderColor=col; dm.style.boxShadow=`0 0 12px ${col}`;
+    fxLayer.appendChild(dm);
+  }
+}
+
+// ── swipe-gesture hint (finger icon sliding) ──
+let swipeHintEl=null;
+function clearSwipeHint(){ if(swipeHintEl){ swipeHintEl.remove(); swipeHintEl=null; } }
+function showSwipeGesture(cellId, d){
+  clearSwipeHint();
+  const [r,c]=RC(cellId), sz=Math.round(cell*0.5), dist=Math.round(cell*0.9);
+  const el=document.createElement('div'); el.className='swipe-hint';
+  el.style.width=sz+'px'; el.style.height=sz+'px';
+  el.style.left=(c*cell+(cell-sz)/2)+'px'; el.style.top=(r*cell+(cell-sz)/2)+'px';
+  el.style.setProperty('--dx',(d.dc*dist)+'px'); el.style.setProperty('--dy',(d.dr*dist)+'px');
+  fxLayer.appendChild(el); swipeHintEl=el;
+}
+function showSwipeTutorial(){           // levels 1-3: demo the CORRECT next swipe
+  if(level>3 || won || !timerID || animating) return;
+  const m = hintMove();                  // the solution's next move
+  if(m && simulate(grid,m.cell,m.d).type!=='illegal'){ showSwipeGesture(m.cell, m.d); return; }
+  for(const k in planetEls){ const c=+k;  // fallback: any legal move
+    for(const d of DIRS){ if(simulate(grid,c,d).type!=='illegal'){ showSwipeGesture(c,d); return; } } }
+}
+
+// ════════════════════════════════════════════════════════════
+//  interaction — press a planet, swipe in a direction to move it
+// ════════════════════════════════════════════════════════════
+function deselect(){ if(sel>=0 && planetEls[sel]) planetEls[sel].classList.remove('sel'); sel=-1; clearArrows(); }
+function pressPlanet(cellId){
+  if(animating||won||!timerID) return;
+  clearSwipeHint();
+  if(sel!==cellId) deselect();
+  sel=cellId; const el=planetEls[cellId]; if(el) el.classList.add('sel');
+  if(landingHints) showLandingRings(cellId);          // tutorial: preview landing spots
+  sfxSelect();
+}
+const SWIPE_MIN=()=>Math.max(15, cell*0.3);
+function attachGesture(el,cellId){
+  let sx=0,sy=0,act=false,pid=null;
+  el.addEventListener('pointerdown',e=>{
+    if(animating||won||!timerID) return;
+    act=true; pid=e.pointerId; sx=e.clientX; sy=e.clientY;
+    pressPlanet(+el.dataset.cell);
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
+    e.preventDefault();
+  });
+  const finish=e=>{
+    if(!act || (pid!=null && e.pointerId!==pid)) return; act=false;
+    const dx=e.clientX-sx, dy=e.clientY-sy, cur=+el.dataset.cell;
+    if(Math.hypot(dx,dy)>=SWIPE_MIN()){
+      const d = Math.abs(dx)>Math.abs(dy) ? (dx>0?DIRS[3]:DIRS[2]) : (dy>0?DIRS[1]:DIRS[0]);
+      doMove(cur,d);
+    }
+    deselect();
+  };
+  el.addEventListener('pointerup',finish);
+  el.addEventListener('pointercancel',()=>{ act=false; deselect(); });
+}
+
+function pushHistory(){ history.push({g:grid.slice(),moves,cap:capturedPairs}); if(history.length>200) history.shift(); }
+
+function shake(cellId){ const el=planetEls[cellId]; if(el){ el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); } }
+function cellCenterLocal(cellId){ const [r,c]=RC(cellId); return {x:c*cell+cell/2, y:r*cell+cell/2}; }
+function ghostAt(cellId,ci){
+  const s=planetSize(), [r,c]=RC(cellId), off=(cell-s)/2;
+  const g=document.createElement('div'); g.className='ghost';
+  g.style.width=s+'px'; g.style.height=s+'px'; g.style.left=(c*cell+off)+'px'; g.style.top=(r*cell+off)+'px';
+  g.style.background=planetBG(ci); g.style.boxShadow=`0 0 ${Math.round(cell*0.16)}px ${PAL[ci].glow}`;
+  fxLayer.appendChild(g);
+  requestAnimationFrame(()=>{ g.style.opacity='0'; g.style.transform='scale(.5)'; });
+  setTimeout(()=>g.remove(),340);
+}
+function trail(fromCell,toCell,ci){
+  const [fr,fc]=RC(fromCell), [tr2,tc2]=RC(toCell);
+  const steps=Math.abs(tr2-fr)+Math.abs(tc2-fc); if(steps<1) return;
+  const n=Math.min(6,steps);
+  for(let i=1;i<=n;i++){ const f=i/(n+1); const r=Math.round(fr+(tr2-fr)*f), c=Math.round(fc+(tc2-fc)*f);
+    setTimeout(()=>ghostAt(ID(r,c),ci), i*15); }
+}
+function warpStreak(aCell,bCell,ci){
+  const a=cellCenterLocal(aCell), b=cellCenterLocal(bCell);
+  const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy), ang=Math.atan2(dy,dx)*180/Math.PI;
+  const h=Math.max(3,Math.round(cell*0.14));
+  const s=document.createElement('div'); s.className='warp-streak';
+  s.style.left=a.x+'px'; s.style.top=a.y+'px'; s.style.width=len+'px'; s.style.height=h+'px'; s.style.marginTop=(-h/2)+'px';
+  s.style.transform=`rotate(${ang}deg)`; s.style.color=PAL[ci].glow;
+  s.style.background=`linear-gradient(90deg, transparent, ${PAL[ci].hi}, #fff)`;
+  fxLayer.appendChild(s); setTimeout(()=>s.remove(),360);
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function slideTo(el,cellId,dur){ return new Promise(res=>{
+  el.style.transition=`left ${dur}ms cubic-bezier(.35,0,.25,1), top ${dur}ms cubic-bezier(.35,0,.25,1)`;
+  placeEl(el,cellId); setTimeout(res,dur+8); }); }
+function teleport(el,landCell){ return new Promise(res=>{
+  el.style.transition='transform .09s ease-in, opacity .09s ease-in'; el.style.opacity='.25'; el.style.transform='scale(.2)';
+  setTimeout(()=>{ el.style.transition='none'; placeEl(el,landCell); void el.offsetWidth;
+    el.style.transition='transform .16s cubic-bezier(.2,1.5,.5,1), opacity .12s ease-out'; el.style.opacity='1'; el.style.transform='scale(1)';
+    setTimeout(res,165); },95); }); }
+function portalFlash(cellId){ const pe=planetEls[cellId]; if(pe){ pe.classList.remove('warp'); void pe.offsetWidth; pe.classList.add('warp'); } }
+
+async function doMove(cellId,d){
+  if(animating||won||!timerID) return;
+  const o=simulate(grid,cellId,d);
+  if(o.type==='illegal'){ shake(cellId); return; }
+  pushHistory();
+  deselect(); clearSwipeHint(); animating=true; moves++; updateHud();
+  const ci=grid[cellId];
+  const el=planetEls[cellId]; el.style.zIndex=60;
+  for(const hop of o.hops){
+    const [fr,fc]=RC(hop.from), [er,ec]=RC(hop.enter);
+    const dist=Math.abs(er-fr)+Math.abs(ec-fc);
+    trail(hop.from, hop.enter, ci);
+    await slideTo(el, hop.enter, Math.max(80, dist*46));
+    if(hop.portal){
+      portalFlash(hop.enter); portalFlash(hop.exitPlanet); warpStreak(hop.enter,hop.exitPlanet,ci); sfxWarp();
+      trail(hop.exitPlanet, hop.land, ci);
+      await teleport(el, hop.land);
+    }
+  }
+  if(o.type==='collision'){
+    const tEl=planetEls[o.partner];
+    el.classList.add('pop'); if(tEl) tEl.classList.add('pop');
+    const ctr=cellCenterClient(o.partner);
+    spawnSparks(ctr.x,ctr.y,[PAL[grid[cellId]].hi,PAL[grid[cellId]].mid,'#ffffff','#9de2ff']);
+    sfxCapture();
+    const a=el,b=tEl; setTimeout(()=>{ a&&a.remove(); b&&b.remove(); },430);
+    grid[cellId]=-1; grid[o.partner]=-1; delete planetEls[cellId]; delete planetEls[o.partner];
+    capturedPairs++;
+  } else {
+    grid[o.to]=grid[cellId]; grid[cellId]=-1;
+    planetEls[o.to]=el; delete planetEls[cellId]; el.dataset.cell=o.to;
+    el.style.zIndex=10; el.style.transition='';
+  }
+  animating=false; updateHud();
+  if(grid.every(x=>x<0)) winGame();
+  else { checkStuck(); if(level<=3 && timerID) setTimeout(showSwipeTutorial, 450); }
+}
+
+function checkStuck(){
+  if(listMoves(grid).length===0 && grid.some(x=>x>=0)){
+    msgEl.textContent='⚠️ 无可走的步 — 试试「撤销」或「重置」';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  hud / flow
+// ════════════════════════════════════════════════════════════
+const levelEl=$('level');
+function updateHud(){ levelEl.textContent=level; movesEl.textContent=moves; pairsEl.textContent=(totalPairs-capturedPairs)+'/'+totalPairs; }
+function lsGet(k,def){ try{ const v=localStorage.getItem(k); return v==null?def:+v; }catch(e){ return def; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+
+function tutorialTip(n){
+  return ['', '🎓 教学：按住星球，朝想去的方向「滑动」它',
+    '🎓 撞上异色星球，会从它的「同色伙伴」处穿出来',
+    '🎓 蓝圈=移动落点，绿圈=同色相撞、双双消除',
+    '🎓 善用「穿越」把同色星球送到一起相撞',
+    '🎓 最后一关教学，之后就没有落点提示啦～'][n] || '';
+}
+// does a "kill the first available pair" player clear the board? (cheap easiness probe)
+function greedyClears(g){ let gg=g.slice();
+  for(let s=0;s<90;s++){ if(gg.every(x=>x<0)) return true; const c=listCollisions(gg); if(!c.length) return false; gg=applyTo(gg,c[0]); }
+  return false; }
+// fraction of random-kill playthroughs that clear (lower = needs more planning)
+function randomClearRate(g,reps){ let cl=0;
+  for(let r=0;r<reps;r++){ let gg=g.slice();
+    for(let s=0;s<90;s++){ if(gg.every(x=>x<0)){cl++;break;} const c=listCollisions(gg); if(!c.length)break; gg=applyTo(gg,c[(Math.random()*c.length)|0]); } }
+  return cl/reps; }
+function hardness(g){ return (greedyClears(g)?0:2) + (1-randomClearRate(g,4)); }   // greedy-fail worth most
+
+function buildLevelGrid(){
+  cfg=levelConfig(level); R=cfg.R; C=cfg.C; totalPairs=cfg.pairs; landingHints=cfg.landing;
+  if(!cfg.hard){
+    // tutorial: prefer forgiving boards (a simple greedy order clears them — hard to get stuck)
+    let r=null;
+    for(let t=0;t<24;t++){ const cand=genLevel(); if(!cand) continue; r=cand; if(greedyClears(cand.grid)) break; }
+    if(r){ levelSolution=r.solution; par=r.solution.length; return r.grid; }
+  } else {
+    // L6+: clustered, must-reposition puzzles (perturb a solvable board + verify)
+    const r=genHardLevel();
+    if(r){ levelSolution=r.solution; par=r.solution.length; return r.grid; }
+  }
+  const e=new Array(R*C).fill(-1); e[0]=0; e[1]=0; totalPairs=1; levelSolution=[{cell:0,d:{dr:0,dc:1}}]; par=1; return e;
+}
+function newGame(){
+  clearInterval(timerID); timerID=null;
+  const g=buildLevelGrid();
+  grid=g; startGrid=g.slice();
+  moves=0; capturedPairs=0; won=false; sel=-1; history=[]; hintUsed=false;
+  timeLeft=cfg.time; msgEl.textContent = level<=5 ? tutorialTip(level) : '';
+  $('settle-mask').classList.remove('show');
+  clearSwipeHint();
+  computeCell(); buildGrid(); rebuildPlanets(); updateHud(); startTimer();
+  if(level<=3) setTimeout(showSwipeTutorial, 600);    // demo the swipe gesture
+}
+function nextLevel(){ level++; lsSet('xy_level', level); newGame(); }
+function resetBoard(){ if(won) return; clearInterval(timerID); deselect(); clearSwipeHint();
+  grid=startGrid.slice(); moves=0; capturedPairs=0; history=[];
+  rebuildPlanets(); updateHud(); msgEl.textContent='↺ 已重置'; setTimeout(()=>{if(!won&&msgEl.textContent==='↺ 已重置')msgEl.textContent='';},1100);
+  if(!timerID) startTimer();
+  if(level<=3) setTimeout(showSwipeTutorial, 500);
+}
+function undo(){ if(won||animating||!history.length) return; deselect(); clearSwipeHint();
+  const s=history.pop(); grid=s.g.slice(); moves=s.moves; capturedPairs=s.cap;
+  rebuildPlanets(); updateHud(); msgEl.textContent='';
+  if(level<=3) setTimeout(showSwipeTutorial, 400); }
+function hintMove(){
+  // replay the stored solution; if the board matches a state along it, return the next move
+  if(levelSolution){
+    let b=startGrid.slice(); const cur=grid.join(',');
+    for(let i=0;i<levelSolution.length;i++){
+      if(b.join(',')===cur) return levelSolution[i];
+      const mv=levelSolution[i], o=simulate(b,mv.cell,mv.d);
+      if(o.type==='illegal') break;
+      b=applyTo(b,{cell:mv.cell,d:mv.d,o});
+    }
+  }
+  // fallback live solver — reliable on easy (captures-only) boards & light deviations
+  return cfg.scatter ? null : (solveCaptures(grid)||solveFull(grid));
+}
+function showHint(){
+  if(won||!timerID||animating) return;
+  if(grid.every(x=>x<0)) return;
+  msgEl.textContent='🔍 思考中…';
+  setTimeout(()=>{
+    const m=hintMove();
+    if(!m){ msgEl.textContent = '🤔 这一步算不出解，建议「撤销」回退'; return; }
+    hintUsed=true;
+    deselect(); sel=m.cell; const hel=planetEls[m.cell]; if(hel) hel.classList.add('sel');
+    showLandingRings(m.cell);                              // show landing spots (force, even on hard levels)
+    const dir=m.d.dr+','+m.d.dc;                            // dim non-suggested rings
+    fxLayer.querySelectorAll('.dest').forEach(rg=>{ if(rg.dataset.dir!==dir) rg.style.opacity='0.15'; });
+    showSwipeGesture(m.cell, m.d);                          // animate the suggested swipe
+    msgEl.textContent='💡 朝高亮方向滑动这颗星球';
+  },30);
+}
+function startTimer(){ timerEl.textContent=timeLeft; timerEl.classList.remove('low');
+  timerID=setInterval(()=>{ timeLeft--; timerEl.textContent=timeLeft; timerEl.classList.toggle('low',timeLeft<=15);
+    if(timeLeft<=0){ clearInterval(timerID); timerID=null; loseGame(); } },1000); }
+
+function winGame(){ won=true; clearInterval(timerID); timerID=null; deselect(); sfxWin();
+  msgEl.textContent='🎉 星海清空！';
+  for(let i=0;i<6;i++) setTimeout(()=>spawnSparks(innerWidth/2+(Math.random()-.5)*220, innerHeight*0.4+(Math.random()-.5)*140,
+    ['#9de2ff','#7aa2ff','#4ade80','#ffe08a','#ff6bd0','#c9b8ff']), i*120);
+  setTimeout(()=>showSettle(true),480); }
+function loseGame(){ won=true; deselect(); msgEl.textContent='⏰ 时间到！'; showSettle(false); }
+
+// ════════════════════════════════════════════════════════════
+//  settlement
+// ════════════════════════════════════════════════════════════
+function rankOf(cleared){
+  if(!cleared) return {g:'—',color:'#94a3b8'};
+  if(hintUsed) return {g:'P',color:'#7dd3fc'};
+  const ratio=moves/Math.max(1,par);
+  if(ratio<=1.001) return {g:'S',color:'#ffe08a'};
+  if(ratio<=1.5)   return {g:'A',color:'#67e8f9'};
+  if(ratio<=2.2)   return {g:'B',color:'#a78bfa'};
+  return {g:'C',color:'#94a3b8'};
+}
+function showSettle(cleared){
+  const clearBonus=cleared?cfg.base:0;
+  const timeBonus=cleared?Math.round(timeLeft*cfg.tr):0;
+  const eff=(cleared&&!hintUsed)?Math.round((par/Math.max(1,moves))*cfg.base):0;
+  const total=clearBonus+timeBonus+eff;
+  const rk=rankOf(cleared);
+  $('settle-title').textContent=cleared?(hintUsed?'✅ 过关（用了提示）':'🎉 第 '+level+' 关完成'):'⏰ 时间到';
+  $('settle-sub').textContent='第 '+level+' 关 · '+R+'×'+C+' · 用了 '+moves+' 步（参考 '+par+'）';
+  $('settle-rank').textContent=rk.g; $('settle-rank').style.color=rk.color;
+  const rows=[['🏁 通关奖励',clearBonus],
+    [hintUsed?'🎯 效率（用提示作废）':('🎯 效率 '+moves+'/'+par+'步'),eff],
+    ['⏱ 时间奖励（剩'+(cleared?timeLeft:0)+'s）',timeBonus]];
+  $('settle-rows').innerHTML=rows.map(([k,v])=>`<div class="settle-row"><span>${k}</span><span>${v>0?'+':''}${v}</span></div>`).join('');
+  let cur=0; const step=Math.max(1,Math.ceil(total/40)); const tv=$('settle-total-val'); tv.textContent='0';
+  const anim=setInterval(()=>{ cur+=step; if(cur>=total){cur=total;clearInterval(anim);} tv.textContent=cur; },22);
+  $('sb-next').style.display=cleared?'block':'none';
+  $('settle-mask').classList.add('show');
+  if(cleared&&rk.g==='S') for(let i=0;i<8;i++) setTimeout(()=>spawnSparks(innerWidth/2+(Math.random()-.5)*160,innerHeight*0.42+(Math.random()-.5)*60,['#ffe08a','#fbbf24','#9de2ff']),i*90);
+}
+
+// ════════════════════════════════════════════════════════════
+//  fx helpers
+// ════════════════════════════════════════════════════════════
+function cellCenterClient(cellId){ const [r,c]=RC(cellId); const rect=boardEl.getBoundingClientRect();
+  return { x:rect.left + c*cell + cell/2, y:rect.top + r*cell + cell/2 }; }
+function spawnSparks(cx,cy,colors){
+  for(let i=0;i<10;i++){ const el=document.createElement('div'); el.className='spark';
+    const ang=(Math.PI*2*i)/10+Math.random()*.5, dist=30+Math.random()*46;
+    el.style.setProperty('--tx',Math.cos(ang)*dist+'px'); el.style.setProperty('--ty',(Math.sin(ang)*dist-16)+'px');
+    el.style.setProperty('--dur',(.5+Math.random()*.4)+'s');
+    el.style.background=colors[(Math.random()*colors.length)|0];
+    el.style.left=(cx-4)+'px'; el.style.top=(cy-4)+'px'; el.style.width=el.style.height=(4+Math.random()*5)+'px';
+    document.body.appendChild(el); setTimeout(()=>el.remove(),950); }
+}
+
+// ════════════════════════════════════════════════════════════
+//  audio
+// ════════════════════════════════════════════════════════════
+let actx=null,mgain=null,musicOn=false,mtimer=null,_auto=false,mnodes=new Set();
+function AC(){ if(!actx){ actx=new(window.AudioContext||window.webkitAudioContext)(); mgain=actx.createGain(); mgain.gain.value=.3; mgain.connect(actx.destination);} return actx; }
+function tone(f,t,dur,vol,type){ const ac=AC(),o=ac.createOscillator(),g=ac.createGain(); o.type=type||'sine'; o.frequency.setValueAtTime(f,t);
+  o.connect(g); g.connect(mgain); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+.012);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur); o.start(t); o.stop(t+dur+.02); mnodes.add(o); o.onended=()=>mnodes.delete(o); }
+function sfxSelect(){ const t=AC().currentTime; tone(660,t,.09,.05,'sine'); tone(990,t+.04,.08,.04,'sine'); }
+function sfxCross(d){ const t=AC().currentTime; for(let i=0;i<Math.min(d,5);i++) tone(420+i*70,t+i*.05,.1,.035,'triangle'); }
+function sfxWarp(){ const t=AC().currentTime; tone(720,t,.13,.045,'sine'); tone(1180,t+.05,.12,.03,'triangle'); }
+function sfxCapture(){ const t=AC().currentTime; [523,659,784,1046].forEach((f,i)=>tone(f,t+i*.05,.3,.07,'sine')); tone(160,t,.18,.05,'sine'); }
+function sfxWin(){ const t=AC().currentTime; [523,659,784,1046,1318].forEach((f,i)=>tone(f,t+i*.1,.4,.08,'sine')); }
+// gentle ambient arpeggio
+const ARP=[261.63,329.63,392,523.25,392,329.63, 293.66,349.23,440,587.33,440,349.23,
+          220,329.63,392,523.25,392,329.63, 246.94,392,493.88,392];
+let arpStart=0,arpIdx=0;
+function schedMusic(){ if(!musicOn) return; const ac=AC(), look=ac.currentTime+.4;
+  while(true){ const when=arpStart+arpIdx*.32; if(when<look){ tone(ARP[arpIdx%ARP.length],when,.46,.04,'sine');
+    tone(ARP[arpIdx%ARP.length]/2,when,.5,.025,'triangle'); arpIdx++; } else break; }
+  mtimer=setTimeout(schedMusic,80); }
+function startMusic(){ const ac=AC(); if(ac.state==='suspended')ac.resume(); musicOn=true; arpStart=ac.currentTime+.1; arpIdx=0; schedMusic();
+  const b=$('btn-music'); b.textContent='🔇 关音乐'; }
+function stopMusic(){ musicOn=false; clearTimeout(mtimer); const b=$('btn-music'); b.textContent='🎵 开音乐'; }
+function toggleMusic(){ musicOn?stopMusic():startMusic(); }
+function autoMusic(){ if(!_auto){ _auto=true; try{startMusic();}catch(e){} } }
+document.addEventListener('click',autoMusic,{once:true});
+document.addEventListener('touchstart',autoMusic,{once:true});
+
+// ════════════════════════════════════════════════════════════
+//  background starfield
+// ════════════════════════════════════════════════════════════
+const bg=$('bg-canvas'), bx=bg.getContext('2d'); let STARS=[];
+function initBg(){ bg.width=innerWidth; bg.height=innerHeight; STARS=[];
+  for(let i=0;i<90;i++) STARS.push({x:Math.random()*bg.width,y:Math.random()*bg.height,r:Math.random()*1.6+.3,
+    a:Math.random()*.6+.2,tw:Math.random()*.04+.005,vy:-(Math.random()*.18+.04)}); }
+function animBg(){ bx.clearRect(0,0,bg.width,bg.height);
+  for(const s of STARS){ s.a+=s.tw*(Math.random()<.5?-1:1); s.a=Math.max(.12,Math.min(.85,s.a)); s.y+=s.vy;
+    if(s.y<0){s.y=bg.height;s.x=Math.random()*bg.width;}
+    bx.globalAlpha=s.a; bx.fillStyle='#cfe4ff'; bx.beginPath(); bx.arc(s.x,s.y,s.r,0,7); bx.fill(); }
+  bx.globalAlpha=1; requestAnimationFrame(animBg); }
+addEventListener('resize',()=>{ initBg(); layout(); });
+initBg(); animBg();
+
+// ════════════════════════════════════════════════════════════
+//  bindings & launch
+// ════════════════════════════════════════════════════════════
+$('btn-new').addEventListener('click',()=>{ if(started)newGame(); });
+$('btn-undo').addEventListener('click',undo);
+$('btn-reset').addEventListener('click',resetBoard);
+$('btn-hint').addEventListener('click',showHint);
+$('btn-music').addEventListener('click',toggleMusic);
+$('sb-again').addEventListener('click',()=>{ $('settle-mask').classList.remove('show'); newGame(); });
+$('sb-next').addEventListener('click',()=>{ $('settle-mask').classList.remove('show'); nextLevel(); });
+boardEl.addEventListener('click',()=>deselect());
+
+let _launched=false;
+function launch(e){ if(e){try{e.preventDefault();}catch(_){}} if(_launched)return; _launched=true; started=true;
+  level=Math.max(1, lsGet('xy_level',1));
+  const m=$('welcome-mask'); m.classList.add('hide'); setTimeout(()=>m.style.display='none',500);
+  newGame(); autoMusic(); }
+$('welcome-start').addEventListener('click',launch);
+$('welcome-start').addEventListener('touchend',launch);
+</script>
+<script id="touchGuardScript">
+(function(){
+  const allowText = 'input, textarea, [contenteditable="true"]';
+  const isAllowed = target => {
+    const el = target && target.nodeType === 1 ? target : target && target.parentElement;
+    return !!(el && el.closest && el.closest(allowText));
+  };
+  ['selectstart','dragstart','contextmenu'].forEach(type => {
+    document.addEventListener(type, event => {
+      if(!isAllowed(event.target)) event.preventDefault();
+    }, {passive:false});
+  });
+})();
+</script>
+<script id="hubReturnScript">
+(function(){
+  if(document.getElementById('hubReturnBtn')) return;
+  function hubHref(){
+    const url = new URL(location.href);
+    const parts = url.pathname.split('/');
+    const decoded = parts.map(part => {
+      try{return decodeURIComponent(part);}catch(e){return part;}
+    });
+    const markers = ['G-Game-发布版','g-game-hub','写程序'];
+    let pivot = -1;
+    markers.forEach(marker => {
+      const idx = decoded.lastIndexOf(marker);
+      if(idx > pivot) pivot = idx;
+    });
+    if(pivot >= 0){
+      url.pathname = parts.slice(0, pivot + 1).join('/') + '/G-Game/index.html';
+      url.search = '?v=return-hub';
+      url.hash = '';
+      return url.href;
+    }
+    return new URL('../G-Game/index.html?v=return-hub', location.href).href;
+  }
+  function mount(){
+    if(!document.body) return;
+    const link = document.createElement('a');
+    link.id = 'hubReturnBtn';
+    link.href = hubHref();
+    link.target = '_top';
+    link.textContent = '返回大厅';
+    link.setAttribute('aria-label', '返回大厅');
+    document.body.appendChild(link);
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, {once:true});
+  else mount();
+})();
+</script>
+</body>
+</html>

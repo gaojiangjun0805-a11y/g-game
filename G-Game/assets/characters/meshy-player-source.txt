@@ -1,0 +1,5 @@
+Source: /Users/g/Downloads/Meshy_AI_Meshy_Merged_Animations.glb
+Optimized: embedded PNG textures resized to 2048px max edge, PNG compression level 9
+Original size: 41.59 MB
+Optimized size: 5.07 MB
+Animations: Female_Head_Down_Charge, Lean_Forward_Sprint_inplace, Male_Head_Down_Charge, Running, Walking

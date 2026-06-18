@@ -373,15 +373,15 @@ const ui={
 const SAVE_KEY="arrowMazeMaxUnlocked";
 const DISPLAY_LEVELS=36;
 const BGM_SHARE_URL="https://suno.com/s/X3gx97oPYsp6XQhT";
-const BGM_URL=BGM_SHARE_URL;
-const BGM_VOLUME=.055;
+const BGM_URL="https://cdn1.suno.ai/c12f7ecd-7ce6-4977-a946-6bcea7573131.mp3";
+const BGM_VOLUME=.08;
 let level=1,maxUnlocked=loadUnlockedLevel();
 let puzzle=null,cache=new Map();
 let dpr=1,boardSize=0,pad=0,cell=0;
 let alive=[],state="ready",tries=0,chain=0,startedAt=0,elapsed=0;
 let hover=-1,soundOn=true;
 let anim=null,particles=[],backgroundDots=[];
-let audioCtx=null,bgmAudio=null,bgmFailed=false,launched=false;
+let audioCtx=null,bgmAudio=null,bgmFailed=false,bgmTimer=null,bgmNodes=[],bgmStep=0,launched=false;
 
 function idx(x,y,n=puzzle.n){return y*n+x}
 function xy(i,n=puzzle.n){return {x:i%n,y:Math.floor(i/n)}}
@@ -1113,33 +1113,96 @@ function ensureAudio(){
   if(audioCtx.state==="suspended")audioCtx.resume();
 }
 
+function trackBgmNode(node){
+  bgmNodes.push(node);
+  node.onended=()=>{bgmNodes=bgmNodes.filter(n=>n!==node)};
+}
+
 function getBgm(){
   if(!bgmAudio){
     bgmAudio=new Audio(BGM_URL);
     bgmAudio.preload="auto";
     bgmAudio.loop=true;
     bgmAudio.playsInline=true;
+    bgmAudio.crossOrigin="anonymous";
     bgmAudio.volume=BGM_VOLUME;
     bgmAudio.addEventListener("error",()=>{
       bgmFailed=true;
-      stopBgm();
+      startSoftBgm();
     });
   }
   return bgmAudio;
 }
 
 function startBgm(){
-  if(!soundOn||bgmFailed)return;
+  if(!soundOn)return;
+  ensureAudio();
+  if(bgmFailed||!/^https?:\/\/[^?#]+\.(mp3|m4a|ogg|wav)(\?|#|$)/i.test(BGM_URL)){
+    startSoftBgm();
+    return;
+  }
   const audio=getBgm();
   audio.muted=false;
   audio.volume=BGM_VOLUME;
   const play=audio.play();
-  if(play&&play.catch)play.catch(()=>{});
+  if(play&&play.catch)play.catch(()=>startSoftBgm());
 }
 
 function stopBgm(){
-  if(!bgmAudio)return;
-  bgmAudio.pause();
+  if(bgmAudio)bgmAudio.pause();
+  if(bgmTimer){clearInterval(bgmTimer);bgmTimer=null}
+  for(const node of bgmNodes){
+    try{node.stop()}catch(err){}
+  }
+  bgmNodes=[];
+}
+
+function startSoftBgm(){
+  if(!soundOn||!audioCtx||bgmTimer)return;
+  bgmStep=0;
+  playSoftBgmStep();
+  bgmTimer=setInterval(playSoftBgmStep,920);
+}
+
+function playSoftBgmStep(){
+  if(!soundOn||!audioCtx)return;
+  const now=audioCtx.currentTime;
+  const root=[196,220,247,294][Math.floor(bgmStep/4)%4];
+  const melody=[1,1.5,2,2.5,3,2.5,2,1.5][bgmStep%8];
+  bgmPad(root,now);
+  bgmChime(root*melody,now+.04);
+  bgmStep++;
+}
+
+function bgmPad(freq,when){
+  const osc=audioCtx.createOscillator();
+  const gain=audioCtx.createGain();
+  const filter=audioCtx.createBiquadFilter();
+  osc.type="sine";
+  osc.frequency.setValueAtTime(freq,when);
+  filter.type="lowpass";
+  filter.frequency.setValueAtTime(760,when);
+  gain.gain.setValueAtTime(0,when);
+  gain.gain.linearRampToValueAtTime(.014,when+.08);
+  gain.gain.exponentialRampToValueAtTime(.0001,when+1.15);
+  osc.connect(filter).connect(gain).connect(audioCtx.destination);
+  osc.start(when);
+  osc.stop(when+1.2);
+  trackBgmNode(osc);
+}
+
+function bgmChime(freq,when){
+  const osc=audioCtx.createOscillator();
+  const gain=audioCtx.createGain();
+  osc.type="triangle";
+  osc.frequency.setValueAtTime(freq,when);
+  gain.gain.setValueAtTime(0,when);
+  gain.gain.linearRampToValueAtTime(.018,when+.025);
+  gain.gain.exponentialRampToValueAtTime(.0001,when+.42);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(when);
+  osc.stop(when+.46);
+  trackBgmNode(osc);
 }
 
 function tone(freq,dur,type="sine",gain=.05,delay=0){

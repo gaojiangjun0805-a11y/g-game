@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>算符工厂</title>
-<link rel="stylesheet" href="../算力共用/calc-arcade.css">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../算力共用/calc-arcade.css?v=factory-ui-10">
 </head>
 <body>
 <script>
@@ -13,20 +14,20 @@ window.CALC_ARCADE_CONFIG = {
   mode:'factoryLine',
   title:'算符工厂',
   spacedTitle:'算 符 工 厂',
-  subtitle:'机器流水线 · 加工出目标数',
-  welcome:'每层流水线只能选一台机器，数字会依次被加工。把输入数送到目标出厂值。',
-  badge:'流水线',
+  subtitle:'四段流水线 · 调试加工机器',
+  welcome:'从左到右经过 1-4 号工位。每个工位只选一台机器，把原料数字加工成订单要求的出厂数。',
+  badge:'四步流水线',
   goal:8,
   timeLimit:190,
   penalty:5,
-  accent:'#9de2ff',
-  accent2:'#f97316',
-  warm:'#fde68a',
-  bg:['+','-','×','÷','机','□','■','→'],
-  demo:['输入','12','+7','×2','÷3','→','目标','□','■','机'],
+  accent:'#d98b48',
+  accent2:'#62b86f',
+  warm:'#ffd27a',
+  bg:['齿','管','阀','箱','+','-','×','÷'],
+  demo:['原料','12','工位1','+7','工位2','×2','工位3','÷3','订单','38'],
   music:[196,247,294,330,392,494]
 };
 </script>
-<script src="../算力共用/calc-arcade.js?v=creative-6"></script>
+<script src="../算力共用/calc-arcade.js?v=factory-ui-10"></script>
 </body>
 </html>

@@ -1,0 +1,2181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>蛇阵织图</title>
+  <style>
+    :root {
+      --bg: #0b100d;
+      --panel: rgba(19, 25, 19, .78);
+      --panel-strong: rgba(22, 27, 22, .94);
+      --line: rgba(219, 184, 112, .3);
+      --line-hot: rgba(239, 210, 145, .7);
+      --text: #f8f0df;
+      --muted: #b9ad99;
+      --warn: #e45d4e;
+      --good: #7ec78c;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(126,199,140,.12), transparent 30%),
+        radial-gradient(circle at 82% 76%, rgba(208,139,82,.14), transparent 34%),
+        linear-gradient(135deg, #09100d, #16130f 48%, #0c1118);
+      color: var(--text);
+      font-family: "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+      user-select: none;
+      touch-action: none;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.026) 1px, transparent 1px);
+      background-size: 34px 34px;
+      opacity: .46;
+      z-index: 1;
+    }
+
+    #board {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 0;
+      cursor: default;
+      touch-action: none;
+    }
+
+    #board.ready {
+      cursor: pointer;
+    }
+
+    #hud {
+      position: fixed;
+      left: max(14px, env(safe-area-inset-left));
+      right: max(14px, env(safe-area-inset-right));
+      top: max(12px, env(safe-area-inset-top));
+      z-index: 5;
+      display: grid;
+      grid-template-columns: auto minmax(260px, 1fr) auto;
+      gap: 10px;
+      align-items: start;
+      pointer-events: none;
+    }
+
+    .brand,
+    .stats,
+    .actions,
+    #toast,
+    .modal-card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 18px 50px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.08);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+
+    .brand {
+      min-width: 190px;
+      padding: 12px 14px;
+      border-radius: 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.42rem;
+      line-height: 1;
+      font-weight: 900;
+      color: #fff4db;
+    }
+
+    .brand span {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .stats {
+      justify-self: center;
+      width: min(100%, 540px);
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1px;
+      overflow: hidden;
+      border-radius: 8px;
+      pointer-events: auto;
+    }
+
+    .stat {
+      min-height: 58px;
+      padding: 9px 10px;
+      background: rgba(255,255,255,.045);
+      overflow: hidden;
+    }
+
+    .stat span {
+      display: block;
+      color: var(--muted);
+      font-size: .72rem;
+      line-height: 1;
+      font-weight: 800;
+    }
+
+    .stat b {
+      display: block;
+      margin-top: 7px;
+      color: #fff;
+      font-size: 1.26rem;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat.hot b {
+      color: #ffb38d;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      padding: 8px;
+      border-radius: 8px;
+      pointer-events: auto;
+    }
+
+    button {
+      width: 42px;
+      height: 42px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 8px;
+      background: rgba(255,255,255,.08);
+      color: var(--text);
+      font: inherit;
+      font-size: 1.05rem;
+      font-weight: 900;
+      cursor: pointer;
+      transition: transform .12s ease, border-color .16s ease, background .16s ease;
+    }
+
+    button:active {
+      transform: scale(.94);
+    }
+
+    button.primary {
+      width: auto;
+      min-width: 108px;
+      padding: 0 16px;
+      background: linear-gradient(135deg, #e7bd72, #79c18d);
+      color: #111611;
+      border: none;
+      font-size: .95rem;
+    }
+
+    button:hover {
+      border-color: var(--line-hot);
+      background: rgba(255,255,255,.13);
+    }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: max(24px, env(safe-area-inset-bottom));
+      z-index: 8;
+      transform: translate(-50%, 16px);
+      min-width: min(82vw, 360px);
+      max-width: min(88vw, 520px);
+      padding: 11px 15px;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: 900;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    #toast.bad {
+      border-color: rgba(228,93,78,.62);
+      color: #ffd9d3;
+      background: rgba(50, 20, 17, .84);
+    }
+
+    #toast.good {
+      border-color: rgba(126,199,140,.62);
+      color: #eaffea;
+      background: rgba(16, 44, 24, .8);
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      place-items: center;
+      padding: 18px;
+      background: rgba(6, 8, 6, .62);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+
+    .modal.show {
+      display: grid;
+    }
+
+    .modal-card {
+      width: min(92vw, 420px);
+      padding: 24px;
+      border-radius: 8px;
+      text-align: center;
+      background: var(--panel-strong);
+    }
+
+    .modal-card h2 {
+      margin: 0 0 10px;
+      font-size: 1.72rem;
+      line-height: 1.1;
+    }
+
+    .modal-card p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    @media (max-width: 760px) {
+      #hud {
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+      }
+
+      .brand {
+        min-width: 0;
+        padding: 10px 11px;
+      }
+
+      h1 {
+        font-size: 1.14rem;
+      }
+
+      .brand span {
+        font-size: .7rem;
+      }
+
+      .stats {
+        grid-column: 1 / 3;
+        grid-row: 2;
+        width: 100%;
+      }
+
+      .actions {
+        justify-self: end;
+      }
+
+      .stat {
+        min-height: 51px;
+        padding: 8px 7px;
+      }
+
+      .stat b {
+        font-size: 1.06rem;
+      }
+
+      button {
+        width: 38px;
+        height: 38px;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .stats {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+
+      .stat {
+        padding: 7px 5px;
+      }
+
+      .stat span {
+        font-size: .66rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="board" aria-label="蛇阵织图平面游戏"></canvas>
+
+  <main id="hud">
+    <section class="brand" aria-label="游戏标题">
+      <h1>蛇阵织图</h1>
+      <span id="levelName">第一结</span>
+    </section>
+
+    <section class="stats" aria-label="状态">
+      <div class="stat hot"><span>命</span><b id="lives">5</b></div>
+      <div class="stat"><span>余蛇</span><b id="leftCount">0</b></div>
+      <div class="stat"><span>步</span><b id="moveCount">0</b></div>
+      <div class="stat"><span>撞</span><b id="hitCount">0</b></div>
+      <div class="stat"><span>阶</span><b id="levelCount">1</b></div>
+    </section>
+
+    <section class="actions" aria-label="操作">
+      <button id="prevBtn" title="上一结" aria-label="上一结">‹</button>
+      <button id="resetBtn" title="重置本结" aria-label="重置本结">↺</button>
+      <button id="nextBtnTop" title="下一结" aria-label="下一结">›</button>
+    </section>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <section id="result" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <h2 id="resultTitle">挑战成功</h2>
+      <p id="resultText">小蛇全部游出织图。</p>
+      <div class="modal-actions">
+        <button id="againBtn" class="primary">再来</button>
+        <button id="nextBtn" class="primary">下一结</button>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const canvas = document.getElementById("board");
+    const ctx = canvas.getContext("2d");
+
+    const livesEl = document.getElementById("lives");
+    const leftEl = document.getElementById("leftCount");
+    const movesEl = document.getElementById("moveCount");
+    const hitsEl = document.getElementById("hitCount");
+    const levelEl = document.getElementById("levelCount");
+    const levelNameEl = document.getElementById("levelName");
+    const toastEl = document.getElementById("toast");
+    const resultEl = document.getElementById("result");
+    const resultTitleEl = document.getElementById("resultTitle");
+    const resultTextEl = document.getElementById("resultText");
+
+    const prevBtn = document.getElementById("prevBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const nextBtnTop = document.getElementById("nextBtnTop");
+    const againBtn = document.getElementById("againBtn");
+    const nextBtn = document.getElementById("nextBtn");
+
+    const DIRS = [
+      { key: "r", x: 1, y: 0, name: "右" },
+      { key: "l", x: -1, y: 0, name: "左" },
+      { key: "d", x: 0, y: 1, name: "下" },
+      { key: "u", x: 0, y: -1, name: "上" }
+    ];
+
+    const ACCENTS = ["#e9d35f", "#ff8f5b", "#f26f91", "#83c9ff", "#a7df74", "#7bd7bd", "#c995ff"];
+    const ROPE_COLORS = ["#5fb35f", "#6fcf83", "#4ea078", "#88b94e", "#3f8f65", "#7abc59"];
+    const BASE_SEED = 20260616;
+    let cachedTanglePuzzle = null;
+
+    const state = {
+      level: 1,
+      lives: 5,
+      moves: 0,
+      hits: 0,
+      board: null,
+      ropes: [],
+      occupancy: new Map(),
+      hovered: null,
+      busy: false,
+      ended: false,
+      animation: null,
+      layout: {
+        x: 0,
+        y: 0,
+        cell: 32,
+        w: 0,
+        h: 0
+      },
+      pointer: { x: -9999, y: -9999 }
+    };
+
+    bindEvents();
+    loadLevel(1);
+    resize();
+    requestAnimationFrame(tick);
+
+    function bindEvents() {
+      window.addEventListener("resize", resize);
+      canvas.addEventListener("pointermove", onPointerMove);
+      canvas.addEventListener("pointerleave", () => {
+        state.hovered = null;
+        canvas.classList.remove("ready");
+      });
+      canvas.addEventListener("pointerdown", onPointerDown);
+
+      prevBtn.addEventListener("click", () => loadLevel(Math.max(1, state.level - 1)));
+      resetBtn.addEventListener("click", () => loadLevel(state.level));
+      nextBtnTop.addEventListener("click", () => loadLevel(state.level + 1));
+      againBtn.addEventListener("click", () => loadLevel(state.level));
+      nextBtn.addEventListener("click", () => loadLevel(state.level + 1));
+    }
+
+    function loadLevel(level) {
+      state.level = Math.max(1, level);
+      state.moves = 0;
+      state.hits = 0;
+      state.busy = false;
+      state.ended = false;
+      state.hovered = null;
+      state.animation = null;
+      state.board = buildLevel(state.level);
+      state.lives = state.board.lives;
+      state.ropes = state.board.ropes.map((rope, index) => ({
+        ...rope,
+        index,
+        removed: false,
+        flashUntil: 0,
+        shakeUntil: 0,
+        pull: null
+      }));
+      rebuildOccupancy();
+      resultEl.classList.remove("show");
+      resultEl.setAttribute("aria-hidden", "true");
+      levelNameEl.textContent = `第${toChineseCount(state.level)}结 ${state.board.name}`;
+      updateHud();
+      resize();
+      showToast(state.level < 3 ? "新结已成" : "密结已成", "good");
+    }
+
+    function buildLevel(level) {
+      if (level === 1) return tutorialOne();
+      if (level === 2) return tutorialTwo();
+      if (level === 3) return layeredPuzzle();
+      return generatedHardLevel(level);
+    }
+
+    function tutorialOne() {
+      return {
+        name: "入门",
+        cols: 8,
+        rows: 8,
+        lives: 5,
+        ropes: [
+          rope("r0", "r", [[7,1],[6,1],[5,1],[5,2],[4,2]], 0),
+          rope("r1", "l", [[0,6],[1,6],[2,6],[2,5]], 1),
+          rope("r2", "u", [[3,0],[3,1],[2,1],[2,2]], 2),
+          rope("r3", "d", [[6,7],[6,6],[5,6],[5,5]], 3)
+        ]
+      };
+    }
+
+    function tutorialTwo() {
+      return {
+        name: "拦路",
+        cols: 10,
+        rows: 9,
+        lives: 5,
+        ropes: [
+          rope("r0", "r", [[9,2],[8,2],[7,2],[7,3],[6,3]], 0),
+          rope("r1", "r", [[5,2],[4,2],[4,1],[3,1]], 1),
+          rope("r2", "l", [[0,6],[1,6],[2,6],[2,5],[3,5]], 2),
+          rope("r3", "l", [[4,6],[5,6],[5,7],[6,7]], 3),
+          rope("r4", "u", [[6,0],[6,1],[5,1],[5,0]], 4),
+          rope("r5", "d", [[3,8],[3,7],[4,7],[4,8]], 5),
+          rope("r6", "u", [[2,0],[2,1],[1,1],[1,2]], 6)
+        ]
+      };
+    }
+
+    function layeredPuzzle() {
+      const cols = 34;
+      const rows = 24;
+      if (!cachedTanglePuzzle) cachedTanglePuzzle = generateNestedTanglePuzzle(BASE_SEED + 24984, cols, rows);
+      return {
+        name: "乱锁阵",
+        cols,
+        rows,
+        lives: 9,
+        ropes: cachedTanglePuzzle.map(item => ({
+          id: item.id,
+          dir: item.dir,
+          colorIndex: item.colorIndex,
+          cells: item.cells.map(cell => ({ ...cell }))
+        }))
+      };
+    }
+
+    function generateNestedTanglePuzzle(seed, cols, rows) {
+      const rand = mulberry32(seed);
+      const ropes = [];
+      const assigned = new Set();
+      const unassigned = new Set();
+
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) unassigned.add(`${x},${y}`);
+      }
+
+      let guard = 0;
+      while (unassigned.size > 1 && ropes.length < 110 && guard < 180) {
+        guard += 1;
+        const candidate = choosePeelSnake(rand, ropes.length, unassigned, assigned, cols, rows)
+          || fallbackPeelSnake(rand, unassigned, assigned, cols, rows);
+        if (!candidate) break;
+        candidate.id = `r${ropes.length}`;
+        candidate.colorIndex = ropes.length % ACCENTS.length;
+        ropes.push(candidate);
+        candidate.cells.forEach(cell => {
+          const key = cellKey(cell);
+          unassigned.delete(key);
+          assigned.add(key);
+        });
+      }
+
+      appendLooseFillers(ropes, unassigned, assigned, cols, rows);
+      return ropes;
+    }
+
+    function choosePeelSnake(rand, index, unassigned, assigned, cols, rows) {
+      const heads = peelHeads(unassigned, assigned, cols, rows, index < 2);
+      if (!heads.length) return null;
+      const band = peelBand(rand, index, unassigned.size);
+      let best = null;
+      let bestScore = -Infinity;
+
+      shuffleCopy(heads, rand).slice(0, Math.min(160, heads.length)).forEach(head => {
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const cells = growPeelSnake(head, band, rand, unassigned, cols, rows, unassigned.size < 90);
+          if (!cells) continue;
+
+          const nextUnassigned = new Set(unassigned);
+          const nextAssigned = new Set(assigned);
+          cells.forEach(cell => {
+            const key = cellKey(cell);
+            nextUnassigned.delete(key);
+            nextAssigned.add(key);
+          });
+          const nextHeads = nextUnassigned.size
+            ? peelHeads(nextUnassigned, nextAssigned, cols, rows, false).length
+            : 999;
+          if (nextUnassigned.size && !nextHeads) continue;
+          const componentStats = looseComponentStats(nextUnassigned, cols, rows);
+          if (nextUnassigned.size <= 48 && componentStats.singletons) continue;
+
+          const score =
+            cells.length * 8
+            + countTurns(cells) * 32
+            + Math.min(nextHeads, 80) * 3
+            + head.rayLen * 2
+            - looseComponentPenalty(componentStats, nextUnassigned.size)
+            + rand() * 12;
+
+          if (score > bestScore) {
+            bestScore = score;
+            best = {
+              dir: head.dir.key,
+              cells
+            };
+          }
+        }
+      });
+
+      return best;
+    }
+
+    function fallbackPeelSnake(rand, unassigned, assigned, cols, rows) {
+      let heads = peelHeads(unassigned, assigned, cols, rows, false);
+      if (!heads.length) heads = peelHeads(unassigned, assigned, cols, rows, true);
+      if (!heads.length) return null;
+      const band = { min: 2, max: Math.min(12, unassigned.size), turns: 0 };
+      const candidates = shuffleCopy(heads, rand);
+
+      for (const head of candidates) {
+        const cells = growPeelSnake(head, band, rand, unassigned, cols, rows, true);
+        if (!cells) continue;
+        const nextUnassigned = new Set(unassigned);
+        cells.forEach(cell => nextUnassigned.delete(cellKey(cell)));
+        const componentStats = looseComponentStats(nextUnassigned, cols, rows);
+        if (nextUnassigned.size <= 48 && componentStats.singletons) continue;
+        return {
+          dir: head.dir.key,
+          cells
+        };
+      }
+
+      return null;
+    }
+
+    function peelBand(rand, index, remaining) {
+      if (remaining <= 20) return { min: 2, max: Math.min(10, remaining), turns: 0 };
+      const roll = rand();
+      if (index < 2) return { min: 30, max: 48, turns: 7 };
+      if (index < 5) return { min: 22, max: 36, turns: 5 };
+      if (roll < .22) return { min: 5, max: 11, turns: 1 };
+      if (roll < .62) return { min: 10, max: 21, turns: 3 };
+      if (roll < .92) return { min: 20, max: 34, turns: 5 };
+      return { min: 30, max: 42, turns: 6 };
+    }
+
+    function peelHeads(unassigned, assigned, cols, rows, allowBoundaryClear) {
+      const heads = [];
+      unassigned.forEach(key => {
+        const head = parseCellKey(key);
+        DIRS.forEach(dir => {
+          const rayLen = assignedRayLength(head, dir, assigned, cols, rows);
+          if (rayLen === null || (rayLen === 0 && !allowBoundaryClear)) return;
+          const first = addCell(head, oppositeDir(dir));
+          if (!inside(first, cols, rows) || !unassigned.has(cellKey(first))) return;
+          heads.push({ head, dir, rayLen });
+        });
+      });
+      return heads;
+    }
+
+    function growPeelSnake(head, band, rand, unassigned, cols, rows, relaxed) {
+      const maxLength = Math.min(band.max, unassigned.size);
+      const minLength = Math.min(band.min, maxLength);
+      if (maxLength < 2) return null;
+
+      const desiredLength = minLength + Math.floor(rand() * (maxLength - minLength + 1));
+      const first = addCell(head.head, oppositeDir(head.dir));
+      const cells = [head.head, first];
+      const used = new Set(cells.map(cellKey));
+      const layers = boundaryLayerDistances(unassigned, cols, rows);
+      let previousDir = oppositeDir(head.dir);
+
+      while (cells.length < desiredLength) {
+        const current = cells[cells.length - 1];
+        const options = DIRS
+          .filter(dir => !sameDir(dir, oppositeDir(previousDir)))
+          .map(dir => ({ dir, cell: addCell(current, dir) }))
+          .filter(item => inside(item.cell, cols, rows)
+            && unassigned.has(cellKey(item.cell))
+            && !used.has(cellKey(item.cell)));
+
+        if (!options.length) break;
+        const ranked = options
+          .map(item => ({
+            ...item,
+            score: peelStepScore(item, previousDir, layers, unassigned, cols, rows, rand)
+          }))
+          .sort((a, b) => b.score - a.score);
+
+        const spread = rand() < .78 ? 1 : Math.min(3, ranked.length);
+        const chosen = ranked[Math.floor(rand() * spread)];
+        cells.push(chosen.cell);
+        used.add(cellKey(chosen.cell));
+        previousDir = chosen.dir;
+      }
+
+      if (
+        cells.length < minLength
+        || countTurns(cells) < (relaxed ? 0 : band.turns)
+        || !selfCorridorClear(cells, head.dir, cols, rows)
+      ) {
+        return null;
+      }
+      return cells;
+    }
+
+    function peelStepScore(option, previousDir, layers, unassigned, cols, rows, rand) {
+      const layer = layers.get(cellKey(option.cell)) || 8;
+      const boundary = exposedNeighborCount(option.cell, unassigned, cols, rows);
+      const turn = sameDir(option.dir, previousDir) ? -5 : 9;
+      return (5 - Math.min(layer, 5)) * 20 + boundary * 12 + turn + rand() * 10;
+    }
+
+    function boundaryLayerDistances(unassigned, cols, rows) {
+      const distances = new Map();
+      const queue = [];
+
+      unassigned.forEach(key => {
+        const cell = parseCellKey(key);
+        if (!exposedNeighborCount(cell, unassigned, cols, rows)) return;
+        distances.set(key, 1);
+        queue.push(cell);
+      });
+
+      for (let index = 0; index < queue.length; index += 1) {
+        const cell = queue[index];
+        const distance = distances.get(cellKey(cell));
+        DIRS.forEach(dir => {
+          const next = addCell(cell, dir);
+          const key = cellKey(next);
+          if (!unassigned.has(key) || distances.has(key)) return;
+          distances.set(key, distance + 1);
+          queue.push(next);
+        });
+      }
+
+      return distances;
+    }
+
+    function exposedNeighborCount(cell, unassigned, cols, rows) {
+      return DIRS.reduce((sum, dir) => {
+        const next = addCell(cell, dir);
+        return sum + Number(!inside(next, cols, rows) || !unassigned.has(cellKey(next)));
+      }, 0);
+    }
+
+    function looseComponentStats(unassigned, cols, rows) {
+      if (!unassigned.size) {
+        return { components: 0, tiny: 0, singletons: 0 };
+      }
+      const remaining = new Set(unassigned);
+      let components = 0;
+      let tiny = 0;
+      let singletons = 0;
+
+      remaining.forEach(start => {
+        if (!remaining.has(start)) return;
+        components += 1;
+        let size = 0;
+        const queue = [start];
+        remaining.delete(start);
+        for (let index = 0; index < queue.length; index += 1) {
+          size += 1;
+          const cell = parseCellKey(queue[index]);
+          DIRS.forEach(dir => {
+            const next = cellKey(addCell(cell, dir));
+            if (!remaining.has(next)) return;
+            remaining.delete(next);
+            queue.push(next);
+          });
+        }
+        if (size < 3) tiny += 1;
+        if (size === 1) singletons += 1;
+      });
+
+      return { components, tiny, singletons };
+    }
+
+    function looseComponentPenalty(stats, remainingSize) {
+      return stats.singletons * 900 + stats.tiny * 520 + stats.components * 14 + (remainingSize % 2 ? 90 : 0);
+    }
+
+    function appendLooseFillers(ropes, unassigned, assigned, cols, rows) {
+      let guard = 0;
+      while (unassigned.size && guard < cols * rows) {
+        guard += 1;
+        const filler = looseFiller(unassigned, assigned, cols, rows);
+        if (!filler) break;
+        filler.id = `r${ropes.length}`;
+        filler.colorIndex = ropes.length % ACCENTS.length;
+        ropes.push(filler);
+        filler.cells.forEach(cell => {
+          const key = cellKey(cell);
+          unassigned.delete(key);
+          assigned.add(key);
+        });
+      }
+    }
+
+    function looseFiller(unassigned, assigned, cols, rows) {
+      for (const key of unassigned) {
+        const head = parseCellKey(key);
+        const dir = DIRS.find(item => {
+          const length = assignedRayLength(head, item, assigned, cols, rows);
+          return length !== null && length > 0;
+        }) || DIRS.find(item => assignedRayLength(head, item, assigned, cols, rows) !== null);
+        if (!dir) continue;
+        const cells = [head];
+        const tail = addCell(head, oppositeDir(dir));
+        if (inside(tail, cols, rows) && unassigned.has(cellKey(tail))) cells.push(tail);
+        if (cells.length < 2) continue;
+        return { dir: dir.key, cells };
+      }
+      return null;
+    }
+
+    function assignedRayLength(head, dir, assigned, cols, rows) {
+      let cursor = addCell(head, dir);
+      let length = 0;
+      while (inside(cursor, cols, rows)) {
+        length += 1;
+        if (!assigned.has(cellKey(cursor))) return null;
+        cursor = addCell(cursor, dir);
+      }
+      return length;
+    }
+
+    function parseCellKey(key) {
+      const [x, y] = key.split(",").map(Number);
+      return { x, y };
+    }
+
+    function generateTanglePuzzle(seed, cols, rows, target) {
+      let best = [];
+      let bestScore = -Infinity;
+
+      for (let pass = 0; pass < 8; pass += 1) {
+        const rand = mulberry32(seed + pass * 941);
+        const occupancy = new Map();
+        const ropes = [];
+        let attempts = 0;
+
+        while (ropes.length < target && attempts < target * 80) {
+          attempts += 1;
+          let bestCandidate = null;
+          let bestCandidateScore = -Infinity;
+
+          const sampleCount = ropes.length > target * .55 ? 28 : 22;
+          for (let sample = 0; sample < sampleCount; sample += 1) {
+            const band = tangleLengthBand(rand, ropes.length, target);
+            const dir = DIRS[Math.floor(rand() * DIRS.length)];
+            const cells = makeWindingPath(rand, cols, rows, dir, occupancy, band.min, band.max, band.turns);
+            if (!cells) continue;
+
+            const candidate = {
+              id: `r${ropes.length}`,
+              dir: dir.key,
+              cells,
+              colorIndex: ropes.length % ACCENTS.length
+            };
+            const score = scoreTangleCandidate(candidate, ropes, occupancy, cols, rows, rand);
+            if (score > bestCandidateScore) {
+              bestCandidate = candidate;
+              bestCandidateScore = score;
+            }
+          }
+
+          if (!bestCandidate) continue;
+          bestCandidate.cells.forEach(cell => occupancy.set(cellKey(cell), bestCandidate.id));
+          ropes.push(bestCandidate);
+        }
+
+        if (ropes.length < Math.floor(target * .78) || !reverseSolvable(ropes, cols, rows)) continue;
+
+        const clear = countClearRopes(ropes, occupancy, cols, rows);
+        const fill = occupancy.size;
+        const avgTurns = averageTurns(ropes);
+        const avgLength = ropes.reduce((sum, item) => sum + item.cells.length, 0) / ropes.length;
+        const directionMix = new Set(ropes.map(item => item.dir)).size;
+        const score = fill + avgTurns * 42 + avgLength * 8 + directionMix * 120 - clear * 1200;
+
+        if (score > bestScore) {
+          best = ropes;
+          bestScore = score;
+        }
+      }
+
+      if (!best.length) return generatedFallbackTangle(seed, cols, rows, target);
+      const tightened = tightenTangleEntries(best, seed + 9001, cols, rows, 3, 4);
+      return fillTangleGaps(tightened, seed + 17011, cols, rows, .86, 30);
+    }
+
+    function tangleLengthBand(rand, index, target) {
+      if (index > target - 5) {
+        return rand() < .35
+          ? { min: 18, max: 30, turns: 6 }
+          : { min: 28, max: 42, turns: 8 };
+      }
+      const roll = (index * 37 + Math.floor(rand() * 100)) % 10;
+      if (roll < 3) return { min: 8, max: 15, turns: 3 };
+      if (roll < 7) return { min: 16, max: 27, turns: 5 };
+      return { min: 28, max: 42, turns: 7 };
+    }
+
+    function scoreTangleCandidate(candidate, ropes, occupancy, cols, rows, rand) {
+      const beforeClear = clearIdsInOccupancy(ropes, occupancy, cols, rows);
+      const nextOccupancy = new Map(occupancy);
+      candidate.cells.forEach(cell => nextOccupancy.set(cellKey(cell), candidate.id));
+      const nextRopes = [...ropes, candidate];
+      const afterClear = clearIdsInOccupancy(nextRopes, nextOccupancy, cols, rows);
+      const blockedExisting = beforeClear.filter(id => !afterClear.includes(id)).length;
+      const turns = countTurns(candidate.cells);
+      const span = pathSpan(candidate.cells);
+      const directionMix = new Set(nextRopes.map(item => item.dir)).size;
+      const length = candidate.cells.length;
+      const clearPenalty = afterClear.length * 95;
+      const lockBonus = blockedExisting ? blockedExisting * 420 : (ropes.length < 3 ? -80 : -680);
+      const scarceEntryBonus = afterClear.length <= 2 ? 420 : afterClear.length <= 4 ? 180 : -afterClear.length * 35;
+      return lockBonus + scarceEntryBonus - clearPenalty + turns * 20 + length * 4 + span * .18 + directionMix * 35 + rand() * 12;
+    }
+
+    function clearIdsInOccupancy(ropes, occupancy, cols, rows) {
+      return ropes
+        .filter(item => !findBlockerInOccupancy(item, occupancy, cols, rows))
+        .map(item => item.id);
+    }
+
+    function tightenTangleEntries(ropes, seed, cols, rows, desiredClear, maxExtra) {
+      const rand = mulberry32(seed);
+      const result = ropes.map(item => ({
+        ...item,
+        cells: item.cells.map(cell => ({ ...cell }))
+      }));
+      let occupancy = occupancyFor(result);
+      let clear = clearIdsInOccupancy(result, occupancy, cols, rows);
+      let added = 0;
+
+      while (clear.length > desiredClear && added < maxExtra) {
+        let bestCandidate = null;
+        let bestClear = clear;
+        let bestScore = -Infinity;
+
+        for (let sample = 0; sample < 120; sample += 1) {
+          const band = rand() < .55
+            ? { min: 18, max: 32, turns: 6 }
+            : { min: 28, max: 42, turns: 8 };
+          const dir = DIRS[Math.floor(rand() * DIRS.length)];
+          const cells = makeWindingPath(rand, cols, rows, dir, occupancy, band.min, band.max, band.turns);
+          if (!cells) continue;
+
+          const candidate = {
+            id: `r${result.length}`,
+            dir: dir.key,
+            cells,
+            colorIndex: result.length % ACCENTS.length
+          };
+          const nextOccupancy = new Map(occupancy);
+          cells.forEach(cell => nextOccupancy.set(cellKey(cell), candidate.id));
+          const nextRopes = [...result, candidate];
+          const nextClear = clearIdsInOccupancy(nextRopes, nextOccupancy, cols, rows);
+          const reduction = clear.length - nextClear.length;
+          if (reduction <= 0) continue;
+
+          const score = reduction * 1000 - nextClear.length * 150 + countTurns(cells) * 16 + cells.length * 5 + rand() * 8;
+          if (score > bestScore) {
+            bestCandidate = candidate;
+            bestClear = nextClear;
+            bestScore = score;
+          }
+        }
+
+        if (!bestCandidate) break;
+        result.push(bestCandidate);
+        occupancy = occupancyFor(result);
+        clear = bestClear;
+        added += 1;
+      }
+
+      return result;
+    }
+
+    function fillTangleGaps(ropes, seed, cols, rows, targetFillRatio, maxExtra) {
+      const rand = mulberry32(seed);
+      const result = ropes.map(item => ({
+        ...item,
+        cells: item.cells.map(cell => ({ ...cell }))
+      }));
+      let occupancy = occupancyFor(result);
+      let added = 0;
+
+      while (occupancy.size < cols * rows * targetFillRatio && added < maxExtra) {
+        let bestCandidate = null;
+        let bestScore = -Infinity;
+
+        for (let sample = 0; sample < 140; sample += 1) {
+          const band = coverageLengthBand(rand);
+          const dir = DIRS[Math.floor(rand() * DIRS.length)];
+          const cells = makeCoveragePath(rand, cols, rows, dir, occupancy, band.min, band.max, band.turns);
+          if (!cells) continue;
+
+          const candidate = {
+            id: `r${result.length}`,
+            dir: dir.key,
+            cells,
+            colorIndex: result.length % ACCENTS.length
+          };
+          const nextOccupancy = new Map(occupancy);
+          cells.forEach(cell => nextOccupancy.set(cellKey(cell), candidate.id));
+          const nextClear = clearIdsInOccupancy([...result, candidate], nextOccupancy, cols, rows);
+          const score = coverageScore(cells, cols, rows) + cells.length * 12 + countTurns(cells) * 6 - nextClear.length * 55 + rand() * 10;
+
+          if (score > bestScore) {
+            bestCandidate = candidate;
+            bestScore = score;
+          }
+        }
+
+        if (!bestCandidate) break;
+        result.push(bestCandidate);
+        bestCandidate.cells.forEach(cell => occupancy.set(cellKey(cell), bestCandidate.id));
+        added += 1;
+      }
+
+      return result;
+    }
+
+    function coverageLengthBand(rand) {
+      const roll = rand();
+      if (roll < .42) return { min: 5, max: 11, turns: 1 };
+      if (roll < .82) return { min: 12, max: 21, turns: 2 };
+      return { min: 22, max: 32, turns: 4 };
+    }
+
+    function makeCoveragePath(rand, cols, rows, dir, occupancy, minLen, maxLen, minTurns) {
+      for (let attempt = 0; attempt < 260; attempt += 1) {
+        const head = {
+          x: Math.floor(rand() * cols),
+          y: Math.floor(rand() * rows)
+        };
+        if (occupancy.has(cellKey(head))) continue;
+        if (!corridorClear(head, dir, occupancy, cols, rows)) continue;
+
+        const first = addCell(head, oppositeDir(dir));
+        if (!inside(first, cols, rows) || occupancy.has(cellKey(first))) continue;
+
+        const desiredLength = minLen + Math.floor(rand() * (maxLen - minLen + 1));
+        const cells = [head, first];
+        const used = new Set(cells.map(cellKey));
+        let previousDir = oppositeDir(dir);
+
+        while (cells.length < desiredLength) {
+          const current = cells[cells.length - 1];
+          const candidates = shuffleCopy(
+            DIRS.filter(candidate => !sameDir(candidate, oppositeDir(previousDir))),
+            rand
+          )
+            .map(candidate => ({ dir: candidate, cell: addCell(current, candidate) }))
+            .filter(item => inside(item.cell, cols, rows) && !occupancy.has(cellKey(item.cell)) && !used.has(cellKey(item.cell)));
+
+          if (!candidates.length) break;
+
+          candidates.sort((a, b) => {
+            const scoreA = emptyNeighborCount(a.cell, occupancy, used, cols, rows) + centerWeight(a.cell, cols, rows) * 2 + rand();
+            const scoreB = emptyNeighborCount(b.cell, occupancy, used, cols, rows) + centerWeight(b.cell, cols, rows) * 2 + rand();
+            return scoreB - scoreA;
+          });
+
+          const chosen = candidates[0];
+          cells.push(chosen.cell);
+          used.add(cellKey(chosen.cell));
+          previousDir = chosen.dir;
+        }
+
+        if (cells.length < minLen || countTurns(cells) < minTurns || !selfCorridorClear(cells, dir, cols, rows)) continue;
+        return cells;
+      }
+      return null;
+    }
+
+    function coverageScore(cells, cols, rows) {
+      return cells.reduce((sum, cell) => sum + centerWeight(cell, cols, rows) * 18, 0);
+    }
+
+    function centerWeight(cell, cols, rows) {
+      const dx = Math.abs((cell.x + .5) / cols - .5);
+      const dy = Math.abs((cell.y + .5) / rows - .5);
+      return 1 - Math.min(1, Math.hypot(dx, dy) * 1.8);
+    }
+
+    function emptyNeighborCount(cell, occupancy, used, cols, rows) {
+      return DIRS.reduce((sum, dir) => {
+        const next = addCell(cell, dir);
+        const key = cellKey(next);
+        return sum + Number(inside(next, cols, rows) && !occupancy.has(key) && !used.has(key));
+      }, 0);
+    }
+
+    function occupancyFor(ropes) {
+      const occupancy = new Map();
+      ropes.forEach(item => item.cells.forEach(cell => occupancy.set(cellKey(cell), item.id)));
+      return occupancy;
+    }
+
+    function reverseSolvable(ropes, cols, rows) {
+      const occupancy = occupancyFor(ropes);
+
+      for (let index = ropes.length - 1; index >= 0; index -= 1) {
+        const item = ropes[index];
+        if (findBlockerInOccupancy(item, occupancy, cols, rows)) return false;
+        item.cells.forEach(cell => occupancy.delete(cellKey(cell)));
+      }
+      return true;
+    }
+
+    function pathSpan(cells) {
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      cells.forEach(cell => {
+        minX = Math.min(minX, cell.x);
+        minY = Math.min(minY, cell.y);
+        maxX = Math.max(maxX, cell.x);
+        maxY = Math.max(maxY, cell.y);
+      });
+      return (maxX - minX + 1) * (maxY - minY + 1);
+    }
+
+    function averageTurns(ropes) {
+      if (!ropes.length) return 0;
+      return ropes.reduce((sum, item) => sum + countTurns(item.cells), 0) / ropes.length;
+    }
+
+    function generatedFallbackTangle(seed, cols, rows, target) {
+      return generateLevel(seed + 777, cols, rows, target, 14, 28);
+    }
+
+    function generatedHardLevel(level) {
+      const grid = hardGridForViewport(level);
+      const cols = grid.cols;
+      const rows = grid.rows;
+      const target = Math.min(52, 32 + (level - 3) * 3, Math.floor(cols * rows / 18));
+      const minLen = Math.min(16, 12 + Math.floor((level - 3) / 2));
+      const maxLen = Math.min(22, 18 + Math.floor((level - 3) / 2) * 2);
+      const seed = BASE_SEED + level * 997;
+      const generated = generateLevel(seed, cols, rows, target, minLen, maxLen);
+      return {
+        name: "乱麻",
+        cols,
+        rows,
+        lives: Math.max(6, 8 - Math.floor((level - 3) / 4)),
+        ropes: generated
+      };
+    }
+
+    function hardGridForViewport(level) {
+      const hudBottom = window.innerWidth < 760 ? 150 : 92;
+      const pad = window.innerWidth < 760 ? 12 : 26;
+      const availableW = Math.max(280, window.innerWidth - pad * 2);
+      const availableH = Math.max(320, window.innerHeight - hudBottom - pad);
+      const ratio = availableW / availableH;
+      const targetArea = Math.min(900, 680 + (level - 3) * 70);
+      let rows = Math.round(Math.sqrt(targetArea / ratio));
+      let cols = Math.round(rows * ratio);
+      cols = Math.max(18, Math.min(42, cols));
+      rows = Math.max(18, Math.min(38, rows));
+      return { cols, rows };
+    }
+
+    function generateLevel(seed, cols, rows, target, minLen, maxLen) {
+      let best = [];
+      let bestClear = Infinity;
+      let bestFill = 0;
+      for (let pass = 0; pass < 8; pass += 1) {
+        const rand = mulberry32(seed + pass * 131);
+        const occupancy = new Map();
+        const ropes = [];
+        let attempts = 0;
+        while (ropes.length < target && attempts < target * 360) {
+          attempts += 1;
+          const dir = DIRS[Math.floor(rand() * DIRS.length)];
+          const cells = makeWindingPath(rand, cols, rows, dir, occupancy, minLen, maxLen);
+          if (!cells) continue;
+          const id = `r${ropes.length}`;
+          cells.forEach(cell => occupancy.set(cellKey(cell), id));
+          ropes.push({ id, dir: dir.key, cells, colorIndex: ropes.length % ACCENTS.length });
+        }
+        const clear = countClearRopes(ropes, occupancy, cols, rows);
+        const fill = occupancy.size;
+        if (
+          fill > bestFill
+          || (fill === bestFill && ropes.length > best.length)
+          || (fill === bestFill && ropes.length === best.length && clear < bestClear)
+        ) {
+          best = ropes;
+          bestClear = clear;
+          bestFill = fill;
+        }
+        if (ropes.length === target && fill > cols * rows * .68) return ropes;
+      }
+      return best;
+    }
+
+    function makeWindingPath(rand, cols, rows, dir, occupancy, minLen, maxLen, minTurns = 4) {
+      for (let attempt = 0; attempt < 180; attempt += 1) {
+        const desiredLength = minLen + Math.floor(rand() * (maxLen - minLen + 1));
+        const head = {
+          x: Math.floor(rand() * cols),
+          y: Math.floor(rand() * rows)
+        };
+        if (occupancy.has(cellKey(head))) continue;
+
+        const first = addCell(head, oppositeDir(dir));
+        if (!inside(first, cols, rows) || occupancy.has(cellKey(first))) continue;
+        if (!corridorClear(head, dir, occupancy, cols, rows)) continue;
+
+        const cells = [head, first];
+        const used = new Set(cells.map(cellKey));
+        let previousDir = oppositeDir(dir);
+        let ok = true;
+
+        while (cells.length < desiredLength) {
+          const candidates = shuffleCopy(
+            DIRS.filter(candidate => !sameDir(candidate, oppositeDir(previousDir))),
+            rand
+          );
+          candidates.sort((a, b) => Number(sameDir(a, previousDir)) - Number(sameDir(b, previousDir)));
+
+          let chosen = null;
+          for (const candidate of candidates) {
+            const next = addCell(cells[cells.length - 1], candidate);
+            if (!inside(next, cols, rows) || occupancy.has(cellKey(next)) || used.has(cellKey(next))) continue;
+
+            const relative = { x: next.x - head.x, y: next.y - head.y };
+            if (dotCell(relative, dir) > 2) continue;
+            chosen = candidate;
+            break;
+          }
+
+          if (!chosen) {
+            ok = false;
+            break;
+          }
+
+          const next = addCell(cells[cells.length - 1], chosen);
+          cells.push(next);
+          used.add(cellKey(next));
+          previousDir = chosen;
+        }
+
+        if (!ok || countTurns(cells) < minTurns || !selfCorridorClear(cells, dir, cols, rows)) continue;
+        return cells;
+      }
+      return null;
+    }
+
+    function rope(id, dirKey, coords, colorIndex) {
+      return {
+        id,
+        dir: dirKey,
+        cells: coords.map(([x, y]) => ({ x, y })),
+        colorIndex
+      };
+    }
+
+    function rebuildOccupancy() {
+      state.occupancy = new Map();
+      state.ropes.forEach(rope => {
+        if (rope.removed) return;
+        rope.cells.forEach(cell => state.occupancy.set(cellKey(cell), rope.id));
+      });
+    }
+
+    function updateHud() {
+      livesEl.textContent = state.lives;
+      leftEl.textContent = remainingRopes();
+      movesEl.textContent = state.moves;
+      hitsEl.textContent = state.hits;
+      levelEl.textContent = state.level;
+      prevBtn.disabled = state.level <= 1;
+    }
+
+    function remainingRopes() {
+      return state.ropes.filter(rope => !rope.removed).length;
+    }
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      computeLayout(w, h);
+      render();
+    }
+
+    function computeLayout(width, height) {
+      const hudBottom = window.innerWidth < 760 ? 150 : 92;
+      const pad = window.innerWidth < 760 ? 12 : 26;
+      const availableW = Math.max(260, width - pad * 2);
+      const availableH = Math.max(280, height - hudBottom - pad);
+      const cell = Math.floor(Math.min(
+        availableW / state.board.cols,
+        availableH / state.board.rows
+      ));
+      const boardW = cell * state.board.cols;
+      const boardH = cell * state.board.rows;
+      state.layout = {
+        x: Math.round((width - boardW) / 2),
+        y: Math.round(hudBottom + (availableH - boardH) / 2),
+        cell,
+        w: boardW,
+        h: boardH
+      };
+    }
+
+    function tick(now) {
+      updateAnimation(now || performance.now());
+      render(now || performance.now());
+      requestAnimationFrame(tick);
+    }
+
+    function updateAnimation(now) {
+      if (!state.animation) return;
+      const anim = state.animation;
+      const t = clamp((now - anim.start) / anim.duration, 0, 1);
+      anim.progress = easeInOutCubic(t) * anim.distance;
+      if (t >= 1) {
+        anim.rope.removed = true;
+        anim.rope.pull = null;
+        state.animation = null;
+        state.busy = false;
+        updateHud();
+        if (remainingRopes() === 0) finish(true);
+      }
+    }
+
+    function render(now = performance.now()) {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      ctx.clearRect(0, 0, width, height);
+      drawBackground(width, height);
+      drawBoard();
+
+      const visible = state.ropes.filter(rope => !rope.removed);
+      visible.forEach(rope => drawRope(rope, now, false));
+      if (state.animation) drawPullingRope(state.animation.rope, state.animation.progress, now);
+      visible.forEach(rope => drawArrow(rope, now));
+      drawTutorialHand(now);
+      syncDebugData();
+    }
+
+    function drawBackground(width, height) {
+      const grad = ctx.createLinearGradient(0, 0, width, height);
+      grad.addColorStop(0, "#08100d");
+      grad.addColorStop(.55, "#15140f");
+      grad.addColorStop(1, "#0c1118");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.save();
+      ctx.globalAlpha = .12;
+      ctx.strokeStyle = "#d8b872";
+      ctx.lineWidth = 1;
+      for (let x = -40; x < width + 40; x += 34) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + height * .25, height);
+        ctx.stroke();
+      }
+      for (let y = -40; y < height + 40; y += 34) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y + width * .08);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawBoard() {
+      const { x, y, cell, w, h } = state.layout;
+      ctx.save();
+      ctx.fillStyle = "rgba(5, 12, 8, .62)";
+      ctx.strokeStyle = "rgba(219, 184, 112, .34)";
+      ctx.lineWidth = 1;
+      roundRect(x - 8, y - 8, w + 16, h + 16, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      for (let col = 0; col <= state.board.cols; col += 1) {
+        const gx = x + col * cell;
+        ctx.moveTo(gx, y);
+        ctx.lineTo(gx, y + h);
+      }
+      for (let row = 0; row <= state.board.rows; row += 1) {
+        const gy = y + row * cell;
+        ctx.moveTo(x, gy);
+        ctx.lineTo(x + w, gy);
+      }
+      ctx.strokeStyle = "rgba(219, 184, 112, .12)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawRope(rope, now, asPulling) {
+      if (state.animation && state.animation.rope === rope && !asPulling) return;
+      const points = rope.cells.map(cellCenter);
+      const shake = now < rope.shakeUntil ? Math.sin(now * .08) * 4 * ((rope.shakeUntil - now) / 420) : 0;
+      const dir = dirFor(rope.dir);
+      const offset = asPulling ? { x: 0, y: 0 } : { x: dir.x * shake, y: dir.y * shake };
+      drawRopePath(points, rope, now, offset);
+    }
+
+    function drawPullingRope(rope, progress, now) {
+      const points = rope.cells.map(cellCenter);
+      const head = points[0];
+      const dir = dirFor(rope.dir);
+      const pathLength = pathMeasure(points);
+      const outsideEnd = {
+        x: head.x + dir.x * progress,
+        y: head.y + dir.y * progress
+      };
+      const route = [outsideEnd, ...points];
+      const drawPath = trimPathByLength(route, pathLength);
+      drawRopePath(drawPath, rope, now, { x: 0, y: 0 });
+      drawSnakeHead(outsideEnd, dir, rope, now, false);
+    }
+
+    function drawRopePath(points, rope, now, offset) {
+      if (points.length < 2) return;
+      const cell = state.layout.cell;
+      const width = Math.max(9, cell * .34);
+      const color = ropeColorFor(rope);
+      const hovered = state.hovered === rope;
+      const flashing = now < rope.flashUntil;
+
+      ctx.save();
+      ctx.translate(offset.x, offset.y);
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.shadowColor = "rgba(0,0,0,.42)";
+      ctx.shadowBlur = Math.max(5, cell * .12);
+      ctx.shadowOffsetY = Math.max(3, cell * .08);
+
+      strokePolyline(points, width + 4, flashing ? "#ef6a55" : "rgba(16, 43, 26, .92)");
+      strokePolyline(points, width, flashing ? "#d65d43" : color);
+      ctx.shadowColor = "transparent";
+      strokePolyline(points, Math.max(2, width * .18), hovered ? "#fff0a5" : "rgba(245,230,128,.45)", .78);
+
+      drawScaleBands(points, width, now, flashing);
+      drawSnakeBelly(points, width);
+      ctx.restore();
+    }
+
+    function strokePolyline(points, width, color, alpha = 1) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawScaleBands(points, width, now, flashing) {
+      const spacing = Math.max(9, state.layout.cell * .42);
+      const bandWidth = Math.max(2, width * .16);
+      ctx.save();
+      ctx.lineCap = "round";
+      pointsToSegments(points).forEach((segment, segIndex) => {
+        const dx = segment.b.x - segment.a.x;
+        const dy = segment.b.y - segment.a.y;
+        const len = Math.hypot(dx, dy);
+        if (len < 2) return;
+        const ux = dx / len;
+        const uy = dy / len;
+        const px = -uy;
+        const py = ux;
+        const phase = (now * .012 + segIndex * 5) % spacing;
+        for (let d = phase; d < len; d += spacing) {
+          const cx = segment.a.x + ux * d;
+          const cy = segment.a.y + uy * d;
+          ctx.strokeStyle = flashing ? "rgba(255,230,210,.62)" : "rgba(20,74,41,.52)";
+          ctx.lineWidth = bandWidth;
+          ctx.beginPath();
+          ctx.moveTo(cx - px * width * .38 - ux * width * .18, cy - py * width * .38 - uy * width * .18);
+          ctx.lineTo(cx + px * width * .38 + ux * width * .18, cy + py * width * .38 + uy * width * .18);
+          ctx.stroke();
+          ctx.strokeStyle = "rgba(224,255,150,.45)";
+          ctx.lineWidth = Math.max(1, bandWidth * .45);
+          ctx.beginPath();
+          ctx.moveTo(cx - px * width * .26 - ux * width * .1, cy - py * width * .26 - uy * width * .1);
+          ctx.lineTo(cx + px * width * .26 + ux * width * .1, cy + py * width * .26 + uy * width * .1);
+          ctx.stroke();
+        }
+      });
+      ctx.restore();
+    }
+
+    function drawSnakeBelly(points, width) {
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "rgba(250, 238, 145, .34)";
+      ctx.lineWidth = Math.max(2, width * .16);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawArrow(rope, now) {
+      if (state.animation && state.animation.rope === rope) return;
+      const head = cellCenter(rope.cells[0]);
+      const dir = dirFor(rope.dir);
+      const blocked = Boolean(findBlocker(rope));
+      const hover = state.hovered === rope;
+      const flashing = now < rope.flashUntil;
+      drawSnakeHead(head, dir, rope, now, hover || blocked || flashing);
+    }
+
+    function drawArrowShape(head, dir, color, size, ring) {
+      const tip = {
+        x: head.x + dir.x * size * .72,
+        y: head.y + dir.y * size * .72
+      };
+      const base = {
+        x: head.x - dir.x * size * .14,
+        y: head.y - dir.y * size * .14
+      };
+      const perp = { x: -dir.y, y: dir.x };
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,.44)";
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 3;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = "rgba(255,244,218,.5)";
+      ctx.lineWidth = Math.max(1.5, size * .06);
+      ctx.beginPath();
+      ctx.moveTo(tip.x, tip.y);
+      ctx.lineTo(base.x + perp.x * size * .48, base.y + perp.y * size * .48);
+      ctx.lineTo(base.x - perp.x * size * .48, base.y - perp.y * size * .48);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      if (ring) {
+        ctx.shadowColor = "transparent";
+        ctx.strokeStyle = "rgba(255,239,185,.62)";
+        ctx.lineWidth = Math.max(2, size * .07);
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, size * .78, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawSnakeHead(head, dir, rope, now, ring) {
+      const size = state.layout.cell * .42;
+      const color = accentFor(rope);
+      const perp = { x: -dir.y, y: dir.x };
+      const tip = {
+        x: head.x + dir.x * size * .78,
+        y: head.y + dir.y * size * .78
+      };
+      const jaw = {
+        x: head.x - dir.x * size * .22,
+        y: head.y - dir.y * size * .22
+      };
+
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,.45)";
+      ctx.shadowBlur = 9;
+      ctx.shadowOffsetY = 3;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = "rgba(246,255,218,.65)";
+      ctx.lineWidth = Math.max(1.5, size * .06);
+      ctx.beginPath();
+      ctx.moveTo(tip.x, tip.y);
+      ctx.quadraticCurveTo(
+        head.x + perp.x * size * .58,
+        head.y + perp.y * size * .58,
+        jaw.x + perp.x * size * .46,
+        jaw.y + perp.y * size * .46
+      );
+      ctx.quadraticCurveTo(
+        head.x - dir.x * size * .46,
+        head.y - dir.y * size * .46,
+        jaw.x - perp.x * size * .46,
+        jaw.y - perp.y * size * .46
+      );
+      ctx.quadraticCurveTo(
+        head.x - perp.x * size * .58,
+        head.y - perp.y * size * .58,
+        tip.x,
+        tip.y
+      );
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.shadowColor = "transparent";
+      const eyeA = {
+        x: head.x + dir.x * size * .2 + perp.x * size * .24,
+        y: head.y + dir.y * size * .2 + perp.y * size * .24
+      };
+      const eyeB = {
+        x: head.x + dir.x * size * .2 - perp.x * size * .24,
+        y: head.y + dir.y * size * .2 - perp.y * size * .24
+      };
+      ctx.fillStyle = "#fff8d7";
+      ctx.beginPath();
+      ctx.arc(eyeA.x, eyeA.y, Math.max(2, size * .1), 0, Math.PI * 2);
+      ctx.arc(eyeB.x, eyeB.y, Math.max(2, size * .1), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#111812";
+      ctx.beginPath();
+      ctx.arc(eyeA.x + dir.x * size * .03, eyeA.y + dir.y * size * .03, Math.max(1, size * .045), 0, Math.PI * 2);
+      ctx.arc(eyeB.x + dir.x * size * .03, eyeB.y + dir.y * size * .03, Math.max(1, size * .045), 0, Math.PI * 2);
+      ctx.fill();
+
+      const tongueWiggle = Math.sin(now * .018) * size * .08;
+      const tongueBase = {
+        x: tip.x + dir.x * size * .06,
+        y: tip.y + dir.y * size * .06
+      };
+      const tongueEnd = {
+        x: tip.x + dir.x * size * .42,
+        y: tip.y + dir.y * size * .42
+      };
+      ctx.strokeStyle = "rgba(255, 96, 121, .88)";
+      ctx.lineWidth = Math.max(1.2, size * .055);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(tongueBase.x, tongueBase.y);
+      ctx.lineTo(tongueEnd.x + perp.x * tongueWiggle, tongueEnd.y + perp.y * tongueWiggle);
+      ctx.stroke();
+
+      if (ring) {
+        ctx.strokeStyle = "rgba(255,239,185,.68)";
+        ctx.lineWidth = Math.max(2, size * .07);
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, size * .86, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawTutorialHand(now) {
+      if (!shouldShowTutorialHand()) return;
+      const rope = tutorialTargetRope();
+      if (!rope) return;
+
+      const target = arrowCenterFor(rope);
+      const dir = dirFor(rope.dir);
+      const pulse = (Math.sin(now * .007) + 1) / 2;
+      const bob = Math.sin(now * .006) * state.layout.cell * .08;
+      const tip = {
+        x: target.x - dir.x * state.layout.cell * (.1 + pulse * .1) - dir.y * bob,
+        y: target.y - dir.y * state.layout.cell * (.1 + pulse * .1) + dir.x * bob
+      };
+
+      drawTutorialTap(target, pulse);
+      drawHandPointer(tip, dir, state.layout.cell);
+    }
+
+    function shouldShowTutorialHand() {
+      return state.level <= 2 && !state.busy && !state.ended && !state.animation;
+    }
+
+    function tutorialTargetRope() {
+      return state.ropes.find(rope => !rope.removed && !findBlocker(rope));
+    }
+
+    function arrowCenterFor(rope) {
+      const head = cellCenter(rope.cells[0]);
+      const dir = dirFor(rope.dir);
+      return {
+        x: head.x + dir.x * state.layout.cell * .34,
+        y: head.y + dir.y * state.layout.cell * .34
+      };
+    }
+
+    function drawTutorialTap(target, pulse) {
+      const radius = state.layout.cell * (.54 + pulse * .16);
+      ctx.save();
+      ctx.globalAlpha = .55 - pulse * .24;
+      ctx.strokeStyle = "#fff2a8";
+      ctx.lineWidth = Math.max(2, state.layout.cell * .08);
+      ctx.beginPath();
+      ctx.arc(target.x, target.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawHandPointer(tip, dir, cell) {
+      const scale = clamp(cell / 28, .7, 1.15);
+      const angle = Math.atan2(dir.y, dir.x) - Math.PI / 2;
+
+      ctx.save();
+      ctx.translate(tip.x, tip.y);
+      ctx.rotate(angle);
+      ctx.scale(scale, scale);
+      ctx.shadowColor = "rgba(0, 0, 0, .42)";
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 4;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+
+      ctx.fillStyle = "#f7d6aa";
+      ctx.strokeStyle = "#6b3f25";
+      ctx.lineWidth = 2.2;
+
+      roundRect(-5, 0, 10, 30, 5);
+      ctx.fill();
+      ctx.stroke();
+
+      roundRect(-17, 24, 34, 27, 10);
+      ctx.fill();
+      ctx.stroke();
+
+      roundRect(6, 23, 8, 24, 5);
+      ctx.fill();
+      ctx.stroke();
+
+      roundRect(-3, 23, 8, 25, 5);
+      ctx.fill();
+      ctx.stroke();
+
+      roundRect(-12, 24, 8, 23, 5);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(-16, 32);
+      ctx.rotate(-.72);
+      roundRect(-5, -2, 9, 23, 5);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = "#7ec78c";
+      ctx.strokeStyle = "#315236";
+      roundRect(-18, 48, 36, 10, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function onPointerMove(event) {
+      const point = eventPoint(event);
+      state.pointer = point;
+      const next = pickRope(point);
+      if (next !== state.hovered) {
+        state.hovered = next;
+        canvas.classList.toggle("ready", Boolean(next));
+      }
+    }
+
+    function onPointerDown(event) {
+      if (state.busy || state.ended) return;
+      const rope = pickRope(eventPoint(event));
+      if (!rope) return;
+      tryPull(rope);
+    }
+
+    function pickRope(point) {
+      let best = null;
+      let bestDist = Infinity;
+      const limit = Math.max(18, state.layout.cell * .56);
+      state.ropes.forEach(rope => {
+        if (rope.removed) return;
+        const head = cellCenter(rope.cells[0]);
+        const dir = dirFor(rope.dir);
+        const arrowCenter = {
+          x: head.x + dir.x * state.layout.cell * .34,
+          y: head.y + dir.y * state.layout.cell * .34
+        };
+        const dist = Math.hypot(point.x - arrowCenter.x, point.y - arrowCenter.y);
+        if (dist < limit && dist < bestDist) {
+          best = rope;
+          bestDist = dist;
+        }
+      });
+      return best;
+    }
+
+    function tryPull(rope) {
+      if (state.busy || state.ended || rope.removed) return;
+      state.moves += 1;
+      const blocker = findBlocker(rope);
+      if (blocker) {
+        state.hits += 1;
+        state.lives = Math.max(0, state.lives - 1);
+        const now = performance.now();
+        rope.flashUntil = now + 460;
+        rope.shakeUntil = now + 420;
+        const blockedRope = blocker.self ? null : state.ropes.find(item => item.id === blocker.id);
+        if (blockedRope) blockedRope.flashUntil = now + 560;
+        updateHud();
+        showToast(blocker.self ? "撞到自己的身体，命 -1" : `撞到${dirName(rope.dir)}侧小蛇，命 -1`, "bad");
+        if (state.lives <= 0) finish(false);
+        return;
+      }
+
+      state.busy = true;
+      state.hovered = null;
+      canvas.classList.remove("ready");
+      removeOccupancy(rope);
+      const bodyLength = pathMeasure(rope.cells.map(cellCenter));
+      const distance = bodyLength + (exitSteps(rope) + 1.4) * state.layout.cell;
+      state.animation = {
+        rope,
+        start: performance.now(),
+        duration: clamp(620 + rope.cells.length * 42, 900, 1700),
+        distance,
+        progress: 0
+      };
+      updateHud();
+      showToast("游出一条", "good");
+    }
+
+    function removeOccupancy(rope) {
+      rope.cells.forEach(cell => state.occupancy.delete(cellKey(cell)));
+    }
+
+    function finish(won) {
+      state.ended = true;
+      state.busy = false;
+      resultTitleEl.textContent = won ? "挑战成功" : "蛇阵乱了";
+      resultTextEl.textContent = won
+        ? `用了 ${state.moves} 步，撞蛇 ${state.hits} 次。`
+        : `还剩 ${remainingRopes()} 条小蛇。`;
+      nextBtn.style.display = won ? "inline-block" : "none";
+      resultEl.classList.add("show");
+      resultEl.setAttribute("aria-hidden", "false");
+    }
+
+    function findBlocker(rope) {
+      const dir = dirFor(rope.dir);
+      let cursor = addCell(rope.cells[0], dir);
+      while (inside(cursor, state.board.cols, state.board.rows)) {
+        const id = state.occupancy.get(cellKey(cursor));
+        if (id) return { id, cell: cursor, self: id === rope.id };
+        cursor = addCell(cursor, dir);
+      }
+      return null;
+    }
+
+    function exitSteps(rope) {
+      const dir = dirFor(rope.dir);
+      let steps = 0;
+      let cursor = { ...rope.cells[0] };
+      while (inside(cursor, state.board.cols, state.board.rows)) {
+        steps += 1;
+        cursor = addCell(cursor, dir);
+      }
+      return steps;
+    }
+
+    function countClearRopes(ropes, occupancy, cols, rows) {
+      return ropes.filter(rope => !findBlockerInOccupancy(rope, occupancy, cols, rows)).length;
+    }
+
+    function findBlockerInOccupancy(rope, occupancy, cols, rows) {
+      const dir = dirFor(rope.dir);
+      let cursor = addCell(rope.cells[0], dir);
+      while (inside(cursor, cols, rows)) {
+        const id = occupancy.get(cellKey(cursor));
+        if (id) return id;
+        cursor = addCell(cursor, dir);
+      }
+      return null;
+    }
+
+    function corridorClear(head, dir, occupancy, cols, rows) {
+      let cursor = addCell(head, dir);
+      while (inside(cursor, cols, rows)) {
+        if (occupancy.has(cellKey(cursor))) return false;
+        cursor = addCell(cursor, dir);
+      }
+      return true;
+    }
+
+    function selfCorridorClear(cells, dir, cols, rows) {
+      const ownCells = new Set(cells.map(cellKey));
+      let cursor = addCell(cells[0], dir);
+      while (inside(cursor, cols, rows)) {
+        if (ownCells.has(cellKey(cursor))) return false;
+        cursor = addCell(cursor, dir);
+      }
+      return true;
+    }
+
+    function cellCenter(cell) {
+      return {
+        x: state.layout.x + cell.x * state.layout.cell + state.layout.cell / 2,
+        y: state.layout.y + cell.y * state.layout.cell + state.layout.cell / 2
+      };
+    }
+
+    function eventPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+      };
+    }
+
+    function pathMeasure(points) {
+      let length = 0;
+      for (let i = 0; i < points.length - 1; i += 1) {
+        length += Math.hypot(points[i + 1].x - points[i].x, points[i + 1].y - points[i].y);
+      }
+      return length;
+    }
+
+    function trimPathByLength(points, targetLength) {
+      if (points.length < 2) return points.slice();
+      if (targetLength <= .001) return [points[0]];
+
+      const result = [points[0]];
+      let walked = 0;
+      for (let i = 0; i < points.length - 1; i += 1) {
+        const a = points[i];
+        const b = points[i + 1];
+        const segment = Math.hypot(b.x - a.x, b.y - a.y);
+        if (segment <= .001) continue;
+
+        if (walked + segment <= targetLength) {
+          result.push(b);
+          walked += segment;
+          continue;
+        }
+
+        const t = clamp((targetLength - walked) / segment, 0, 1);
+        result.push({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t
+        });
+        break;
+      }
+      return result;
+    }
+
+    function subPathToDistance(points, distanceInCells) {
+      if (points.length < 2) return points.slice();
+      const distance = distanceInCells * state.layout.cell;
+      if (distance <= .001) return [points[0]];
+      const result = [points[0]];
+      let walked = 0;
+      for (let i = 0; i < points.length - 1; i += 1) {
+        const a = points[i];
+        const b = points[i + 1];
+        const segment = Math.hypot(b.x - a.x, b.y - a.y);
+        if (walked + segment <= distance) {
+          result.push(b);
+          walked += segment;
+          continue;
+        }
+        const t = clamp((distance - walked) / segment, 0, 1);
+        result.push({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t
+        });
+        break;
+      }
+      return result;
+    }
+
+    function pointsToSegments(points) {
+      const segments = [];
+      for (let i = 0; i < points.length - 1; i += 1) segments.push({ a: points[i], b: points[i + 1] });
+      return segments;
+    }
+
+    function isTurn(a, b, c) {
+      const dx1 = Math.sign(b.x - a.x);
+      const dy1 = Math.sign(b.y - a.y);
+      const dx2 = Math.sign(c.x - b.x);
+      const dy2 = Math.sign(c.y - b.y);
+      return dx1 !== dx2 || dy1 !== dy2;
+    }
+
+    function countTurns(cells) {
+      let turns = 0;
+      let previous = null;
+      for (let i = 1; i < cells.length; i += 1) {
+        const current = {
+          x: cells[i].x - cells[i - 1].x,
+          y: cells[i].y - cells[i - 1].y
+        };
+        const signature = cellKey(current);
+        if (previous && previous !== signature) turns += 1;
+        previous = signature;
+      }
+      return turns;
+    }
+
+    function inside(cell, cols, rows) {
+      return cell.x >= 0 && cell.x < cols && cell.y >= 0 && cell.y < rows;
+    }
+
+    function addCell(cell, dir) {
+      return { x: cell.x + dir.x, y: cell.y + dir.y };
+    }
+
+    function oppositeDir(dir) {
+      return { key: oppositeKey(dir.key), x: -dir.x, y: -dir.y };
+    }
+
+    function oppositeKey(key) {
+      return { r: "l", l: "r", u: "d", d: "u" }[key];
+    }
+
+    function sameDir(a, b) {
+      return a.x === b.x && a.y === b.y;
+    }
+
+    function dotCell(a, b) {
+      return a.x * b.x + a.y * b.y;
+    }
+
+    function shuffleCopy(items, rand) {
+      const copy = items.slice();
+      for (let i = copy.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(rand() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function dirFor(keyOrDir) {
+      if (typeof keyOrDir === "object") return keyOrDir;
+      return DIRS.find(dir => dir.key === keyOrDir);
+    }
+
+    function dirName(key) {
+      return dirFor(key).name;
+    }
+
+    function cellKey(cell) {
+      return `${cell.x},${cell.y}`;
+    }
+
+    function ropeColorFor(rope) {
+      return ROPE_COLORS[rope.index % ROPE_COLORS.length];
+    }
+
+    function accentFor(rope) {
+      return ACCENTS[rope.colorIndex % ACCENTS.length];
+    }
+
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function showToast(text, tone = "") {
+      toastEl.textContent = text;
+      toastEl.className = tone;
+      window.clearTimeout(showToast.timer);
+      requestAnimationFrame(() => toastEl.classList.add("show"));
+      showToast.timer = window.setTimeout(() => toastEl.classList.remove("show"), 1200);
+    }
+
+    function mulberry32(seed) {
+      return function rand() {
+        let t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+
+    function easeInOutCubic(t) {
+      return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function toChineseCount(num) {
+      const basic = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+      if (num <= 10) return basic[num];
+      if (num < 20) return `十${basic[num - 10]}`;
+      if (num < 100) {
+        const tens = Math.floor(num / 10);
+        const ones = num % 10;
+        return `${basic[tens]}十${ones ? basic[ones] : ""}`;
+      }
+      return String(num);
+    }
+
+    window.__ropeWeave = {
+      stats() {
+        return debugSnapshot().stats;
+      },
+      arrows() {
+        return debugSnapshot().arrows;
+      }
+    };
+
+    function debugSnapshot() {
+      return {
+        stats: {
+          level: state.level,
+          lives: state.lives,
+          moves: state.moves,
+          hits: state.hits,
+          remaining: remainingRopes(),
+          ropes: state.ropes.length,
+          occupied: state.occupancy.size,
+          cells: state.board.cols * state.board.rows,
+          minLength: ropeLengthSummary().min,
+          maxLength: ropeLengthSummary().max,
+          oneCellRopes: ropeLengthSummary().one
+        },
+        arrows: state.ropes
+          .filter(ropeItem => !ropeItem.removed)
+          .map(ropeItem => {
+            const head = cellCenter(ropeItem.cells[0]);
+            const dir = dirFor(ropeItem.dir);
+            return {
+              id: ropeItem.id,
+              x: head.x + dir.x * state.layout.cell * .34,
+              y: head.y + dir.y * state.layout.cell * .34,
+              blocked: Boolean(findBlocker(ropeItem))
+            };
+          }),
+        tutorial: tutorialDebugSnapshot()
+      };
+    }
+
+    function tutorialDebugSnapshot() {
+      if (!shouldShowTutorialHand()) return { show: false, target: null };
+      const rope = tutorialTargetRope();
+      if (!rope) return { show: false, target: null };
+      const target = arrowCenterFor(rope);
+      return {
+        show: true,
+        target: rope.id,
+        x: Math.round(target.x),
+        y: Math.round(target.y)
+      };
+    }
+
+    function ropeLengthSummary() {
+      const lengths = state.ropes
+        .filter(ropeItem => !ropeItem.removed)
+        .map(ropeItem => ropeItem.cells.length);
+      if (!lengths.length) return { min: 0, max: 0, one: 0 };
+      return {
+        min: Math.min(...lengths),
+        max: Math.max(...lengths),
+        one: lengths.filter(length => length === 1).length
+      };
+    }
+
+    function syncDebugData() {
+      document.documentElement.dataset.ropeWeave = JSON.stringify(debugSnapshot());
+    }
+
+  </script>
+</body>
+</html>

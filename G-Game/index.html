@@ -141,6 +141,20 @@
   .bootActions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
   .bootActions button,.bootActions a{height:44px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.08);padding:0 20px;color:var(--text);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-weight:900}
   .bootActions .start{border:none;background:linear-gradient(135deg,#9fd8ff,#7df0a0);color:#06101c}
+  .bootProfile{display:grid;gap:12px;max-width:560px;margin:0 auto 18px;text-align:left}
+  .fieldLabel{display:grid;gap:7px;color:var(--muted);font-size:13px;font-weight:800}
+  .textInput{
+    width:100%;height:42px;border-radius:12px;border:1px solid var(--line);outline:none;
+    background:rgba(255,255,255,.08);color:var(--text);padding:0 12px;font:900 15px/1 "PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  }
+  .textInput:focus{border-color:rgba(46,230,214,.72);box-shadow:0 0 0 3px rgba(46,230,214,.1)}
+  .presetGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .presetBtn{
+    min-height:46px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);
+    color:var(--text);font-weight:900;text-align:left;padding:8px 10px;cursor:pointer;
+  }
+  .presetBtn.active{border-color:rgba(46,230,214,.78);background:rgba(46,230,214,.14)}
+  .presetBtn small{display:block;color:var(--muted);font-size:11px;margin-top:3px;font-weight:800}
   .fallbackList{display:none;margin-top:18px;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:8px}
   .fallbackList a{color:var(--text);text-decoration:none;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:rgba(255,255,255,.06);font-size:14px;text-align:left}
   body.fallback .fallbackList{display:grid}
@@ -152,6 +166,7 @@
     .brand{min-width:0;padding:8px 10px;border-radius:12px;visibility:hidden}
     .brand h1{font-size:15px}
     .brand p{display:none}
+    .presetGrid{grid-template-columns:1fr}
     .quick{gap:5px;padding:6px;border-radius:12px}
     .quick button{height:30px;padding:0 8px;font-size:12px;border-radius:8px}
     #radarToggle{display:none}
@@ -204,6 +219,16 @@
     <div class="bootLogo">G-Game</div>
     <div class="bootTitle">六维脑力空间</div>
     <div class="bootSub">空间力 · 推理力 · 记忆力 · 观察力 · 创造力 · 计算力</div>
+    <div class="bootProfile">
+      <label class="fieldLabel" for="bootNickname">
+        玩家昵称
+        <input class="textInput" id="bootNickname" maxlength="12" autocomplete="nickname" placeholder="输入你的名字">
+      </label>
+      <div class="fieldLabel">
+        角色选择
+        <div class="presetGrid" id="bootPresetChoices"></div>
+      </div>
+    </div>
     <div class="bootActions">
       <button class="start" id="bootStart" type="button">进入大厅</button>
     </div>
@@ -251,6 +276,14 @@
   <div class="panelTitle">
     <h2>角色 DIY</h2>
     <button class="ghostBtn" id="closeDiy">关闭</button>
+  </div>
+  <div class="diyRow">
+    <h3>玩家昵称</h3>
+    <input class="textInput" id="nicknameInput" maxlength="12" autocomplete="nickname" placeholder="输入你的名字">
+  </div>
+  <div class="diyRow">
+    <h3>角色选择</h3>
+    <div class="choices" id="presetChoices"></div>
   </div>
   <div class="diyRow">
     <h3>服装颜色</h3>
@@ -361,8 +394,13 @@ const ABILITIES = [
 const NUMBER_PUZZLE_MUSIC = 'https://cdn1.suno.ai/95b417d9-14e4-4960-841a-72a8dbcd6ec3.mp3';
 const TANGSHI_MUSIC = 'https://cdn1.suno.ai/ccb5d5f3-7d95-4f7d-a96b-ba8a0b7a044f.mp3';
 const FOLD_COLOR_MUSIC = 'https://cdn1.suno.ai/55609391-8898-4ad5-a602-6934f169d28d.mp3';
-const ASSET_VERSION = '20260616-real-tree-1';
-const REAL_AVATAR_MODEL = `./assets/avatar-animated.glb?v=${ASSET_VERSION}`;
+const ASSET_VERSION = '20260619-character-pencil-1';
+const CHARACTER_MODELS = {
+  astronaut:`./assets/characters/meshy-user-astronaut-run.glb?v=${ASSET_VERSION}`,
+  robot:`./assets/characters/meshy-robot-run.glb?v=${ASSET_VERSION}`,
+  titan:`./assets/characters/meshy-titan-run.glb?v=${ASSET_VERSION}`,
+  pencil:`./assets/characters/meshy-pencil-run.glb?v=${ASSET_VERSION}`
+};
 const WISDOM_TREE_MODEL = `./assets/wisdom-tree/island_tree_optimized.glb?v=${ASSET_VERSION}`;
 const WISDOM_TREE_MOBILE_MODEL = WISDOM_TREE_MODEL;
 const LOW_POWER_DEVICE = innerWidth <= 900 || matchMedia('(pointer: coarse)').matches || (navigator.deviceMemory && navigator.deviceMemory <= 4) || navigator.connection?.saveData;
@@ -373,6 +411,34 @@ const AVATAR_ACTIONS = {
   wave:{label:'挥手', duration:1.9},
   jump:{label:'跳跃', duration:1.05},
   pose:{label:'展示', duration:2.2}
+};
+const AVATAR_PRESETS = {
+  astronaut:{
+    label:'宇航员',
+    note:'白色宇航服 / 太空行动',
+    avatar:{color:'#4aa8ff', skin:'#d9a982', gender:'neutral', hair:'short', height:'mid', build:'standard', suit:'sport', bottom:'pants', shoes:'boot', face:'natural', expression:'bright'}
+  },
+  robot:{
+    label:'机器人',
+    note:'机械机体 / 跑步模块',
+    avatar:{color:'#2ee6d6', skin:'#d9a982', gender:'neutral', hair:'short', height:'mid', build:'standard', suit:'sport', bottom:'pants', shoes:'boot', face:'sharp', expression:'focus'}
+  },
+  titan:{
+    label:'泰坦',
+    note:'Azure Sentinel / 重装护卫',
+    avatar:{color:'#77b7ff', skin:'#d9a982', gender:'neutral', hair:'short', height:'tall', build:'strong', suit:'armor', bottom:'pants', shoes:'boot', face:'sharp', expression:'focus'}
+  },
+  pencil:{
+    label:'铅笔人',
+    note:'Pencil Feet Frenzy / 轻巧跑者',
+    avatar:{color:'#f0c442', skin:'#d9a982', gender:'neutral', hair:'short', height:'mid', build:'slim', suit:'sport', bottom:'pants', shoes:'boot', face:'natural', expression:'bright'}
+  }
+};
+const AVATAR_STYLE_PALETTES = {
+  astronaut:{suit:0xe7edf2, accent:0x4aa8ff, trim:0xeff8ff, dark:0x142133, glow:0x83e8ff},
+  robot:{suit:0xd8e5ea, accent:0x2ee6d6, trim:0xf4fbff, dark:0x07151b, glow:0x8ffff7},
+  titan:{suit:0xaebdca, accent:0x77b7ff, trim:0xe5f2ff, dark:0x182332, glow:0x9fd5ff},
+  pencil:{suit:0xf2c84b, accent:0xff8f3d, trim:0xfff4c4, dark:0x2b2111, glow:0xffdd6d}
 };
 const FACE_PRESETS = {
   natural:{},
@@ -398,6 +464,10 @@ const GAMES = [
   {id:'nebula', name:'星云穿越', zone:'logic', difficulty:'高阶', path:'../星云穿越/index.html', internalAudio:true, desc:'让星球穿越、碰撞、连锁清空。', abilities:{logic:.5, space:.32, observe:.18}},
   {id:'brush-world', name:'提笔乾坤', zone:'create', difficulty:'进阶', path:'../蜂巢一笔/index.html', internalAudio:true, desc:'一笔连格，构造每圈同色的路径。', abilities:{create:.42, space:.32, logic:.26}},
   {id:'sand-blocks', name:'沙画方块', zone:'observe', difficulty:'进阶', path:'../沙画方块/index.html', internalAudio:true, desc:'让方块化为沙粒，在堆积中寻找消除机会。', abilities:{observe:.42, space:.32, create:.26}},
+  {id:'one-shutter', name:'一秒快门', zone:'memory', difficulty:'进阶', path:'../一秒快门/index.html', internalAudio:true, desc:'快门一闪而过，记住黑格并在棋盘上复原。', abilities:{memory:.58, observe:.3, space:.12}},
+  {id:'light-cruise', name:'光点巡航', zone:'memory', difficulty:'进阶', path:'../光点巡航/index.html', internalAudio:true, desc:'记住金色光点的巡航路线，避开蓝色干扰点复现顺序。', abilities:{memory:.56, observe:.32, space:.12}},
+  {id:'magic-wall-spot', name:'魔方墙找茬', zone:'observe', difficulty:'高阶', path:'../镜像裂隙/index.html', desc:'横屏观察两面同序魔方墙，找出右侧所有不同。', abilities:{observe:.66, space:.22, memory:.12}},
+  {id:'snake-weave', name:'蛇阵织图', zone:'observe', difficulty:'高阶', path:'../结绳立方/index.html', desc:'在满屏缠绕的蛇阵里寻找可抽出的蛇头，层层解开。', abilities:{observe:.58, logic:.26, space:.16}},
   {id:'tangshi', name:'唐诗华容道', zone:'memory', difficulty:'进阶', path:'../唐诗华容道/唐诗华容道.html', internalAudio:true, desc:'拼回唐诗句段，在诗词记忆中通关。', abilities:{memory:.58, space:.24, observe:.18}},
   {id:'hex-speed', name:'六边速滑', zone:'observe', difficulty:'入门', path:'../六边速滑/index.html', internalAudio:true, desc:'在六边轨道里快速判断方向与时机。', abilities:{observe:.48, space:.34, logic:.18}},
   {id:'operator-factory', name:'算符工厂', zone:'calc', difficulty:'进阶', path:'../算符工厂/index.html', internalAudio:true, desc:'选择流水线机器，把输入数加工成目标值。', abilities:{calc:.62, logic:.26, observe:.12}},
@@ -446,6 +516,7 @@ const portalMotifs = [];
 const zoneGroups = {};
 const crystals = {};
 const wisdomTreeParts = [];
+const walkSurfaceTemp = new THREE.Vector3();
 let activeGame = null;
 let hoveredPortal = null;
 let focusedPortal = null;
@@ -454,6 +525,7 @@ let hubEntered = false;
 let last = performance.now();
 let avatarMoving = false;
 let avatarAction = {name:'idle', time:999, duration:0};
+let avatarModelLoadToken = 0;
 
 buildWorld();
 const avatar = buildAvatar();
@@ -490,16 +562,21 @@ drawRadar();
 renderLoop();
 setTimeout(checkCanvasVisible, 1200);
 setTimeout(primeHubAudio, 40);
+setTimeout(openLinkedGameFromHub, 80);
 AUTOPLAY_RETRY_DELAYS.forEach(delay => setTimeout(()=>startHubAudio(true), delay));
 
 function loadState(){
   const defaults = {
     abilities:{space:20,logic:20,memory:20,observe:20,create:20,calc:20},
     completed:{},
+    profile:{nickname:'玩家', preset:'astronaut'},
     avatar:{color:'#4aa8ff', skin:'#d9a982', face:'natural', expression:'neutral', gender:'neutral', hair:'short', height:'mid', build:'standard', suit:'sport', bottom:'pants', legwear:'bare', shoes:'boot'}
   };
   try{
     const saved = JSON.parse(localStorage.getItem('ggame-hub-v1')) || {};
+    const profile = {...defaults.profile, ...(saved.profile||{})};
+    profile.nickname = sanitizeNickname(profile.nickname);
+    if(!Object.prototype.hasOwnProperty.call(AVATAR_PRESETS, profile.preset)) profile.preset = 'astronaut';
     const avatar = {...defaults.avatar, ...(saved.avatar||{})};
     if(!/^#[0-9a-f]{6}$/i.test(avatar.skin || '')) avatar.skin = defaults.avatar.skin;
     if(!Object.prototype.hasOwnProperty.call(FACE_PRESETS, avatar.face)) avatar.face = 'natural';
@@ -515,6 +592,7 @@ function loadState(){
     return {
       abilities:{...defaults.abilities, ...(saved.abilities||{})},
       completed:{...(saved.completed||{})},
+      profile,
       avatar
     };
   }catch(e){ return defaults; }
@@ -522,6 +600,35 @@ function loadState(){
 function saveState(){ localStorage.setItem('ggame-hub-v1', JSON.stringify(state)); }
 
 function abilityByKey(key){ return ABILITIES.find(a=>a.key===key); }
+function sanitizeNickname(value){
+  const cleaned = String(value || '').replace(/\s+/g, ' ').trim().slice(0, 12);
+  return cleaned || '玩家';
+}
+function getAvatarModelKind(){
+  return Object.prototype.hasOwnProperty.call(CHARACTER_MODELS, state.profile?.preset) ? state.profile.preset : 'astronaut';
+}
+function getAvatarModelUrl(){
+  return CHARACTER_MODELS[getAvatarModelKind()] || CHARACTER_MODELS.astronaut;
+}
+function applyAvatarPreset(key){
+  const previousModel = getAvatarModelUrl();
+  const preset = AVATAR_PRESETS[key] || AVATAR_PRESETS.astronaut;
+  state.profile.preset = Object.prototype.hasOwnProperty.call(AVATAR_PRESETS, key) ? key : 'astronaut';
+  state.avatar = {...state.avatar, ...preset.avatar};
+  state.avatar.legwear = 'bare';
+  saveState();
+  applyAvatarStyle();
+  updateAvatarNameLabel();
+  updateProfileUi();
+  updateDiyActive();
+  if(previousModel !== getAvatarModelUrl()) loadRealAvatarModel();
+}
+function commitNickname(value){
+  state.profile.nickname = sanitizeNickname(value);
+  saveState();
+  updateAvatarNameLabel();
+  updateProfileUi();
+}
 function makeMat(color, rough=.48, metal=.08, emissive=0){
   const mat = new THREE.MeshStandardMaterial({color, roughness:rough, metalness:metal});
   if(emissive){ mat.emissive = new THREE.Color(color); mat.emissiveIntensity = emissive; }
@@ -542,15 +649,15 @@ function makeAviationFloorMaterial(repeat=8){
   c.height = 512;
   const ctx = c.getContext('2d');
   const grad = ctx.createLinearGradient(0,0,512,512);
-  grad.addColorStop(0,'#2a3443');
-  grad.addColorStop(.48,'#182130');
-  grad.addColorStop(1,'#354052');
+  grad.addColorStop(0,'#202833');
+  grad.addColorStop(.48,'#151c25');
+  grad.addColorStop(1,'#2a323d');
   ctx.fillStyle = grad;
   ctx.fillRect(0,0,512,512);
 
   const noise = ctx.createImageData(512,512);
   for(let i=0;i<noise.data.length;i+=4){
-    const v = 118 + Math.random() * 22;
+    const v = 92 + Math.random() * 18;
     noise.data[i] = v;
     noise.data[i+1] = v + 8;
     noise.data[i+2] = v + 18;
@@ -559,9 +666,9 @@ function makeAviationFloorMaterial(repeat=8){
   ctx.putImageData(noise,0,0);
 
   const sheen = ctx.createLinearGradient(0,0,512,0);
-  sheen.addColorStop(0,'rgba(255,255,255,.05)');
-  sheen.addColorStop(.5,'rgba(255,255,255,.16)');
-  sheen.addColorStop(1,'rgba(255,255,255,.04)');
+  sheen.addColorStop(0,'rgba(255,255,255,.025)');
+  sheen.addColorStop(.5,'rgba(255,255,255,.095)');
+  sheen.addColorStop(1,'rgba(255,255,255,.02)');
   ctx.fillStyle = sheen;
   ctx.fillRect(0,0,512,512);
 
@@ -571,12 +678,12 @@ function makeAviationFloorMaterial(repeat=8){
   texture.repeat.set(repeat, repeat);
   texture.anisotropy = 4;
   return new THREE.MeshStandardMaterial({
-    color:0xb4c0ca,
+    color:0x87929b,
     map:texture,
-    roughness:.36,
-    metalness:.46,
+    roughness:.46,
+    metalness:.34,
     emissive:0x09111c,
-    emissiveIntensity:.08
+    emissiveIntensity:.045
   });
 }
 function roundedRect(ctx, x, y, w, h, r){
@@ -814,24 +921,128 @@ function createAbilityMonument(ability, color){
   group.add(trim);
   if(ability.key === 'observe'){
     const eye = new THREE.Group();
-    eye.position.set(0,2.12,-.35);
-    const sclera = new THREE.Mesh(new THREE.SphereGeometry(1.18,48,24), ivory);
-    sclera.scale.set(2.3,.62,.5);
+    eye.position.set(0,2.18,-.36);
+    eye.rotation.y = Math.PI;
+    const eagleIvory = makeMat(0xf2e1bd,.48,.07,.04);
+    const amber = makeMat(0xd99421,.28,.18,.52);
+    const darkFeather = makeMat(0x2b241e,.68,.16,.02);
+    const bronzeFeather = makeMat(0x8a6239,.48,.22,.05);
+    const rimGold = makeMat(0xd0a95f,.32,.28,.08);
+    const glassy = new THREE.MeshStandardMaterial({
+      color:0xdaf7ff,
+      roughness:.04,
+      metalness:.02,
+      transparent:true,
+      opacity:.3,
+      emissive:col,
+      emissiveIntensity:.15
+    });
+    const shapeMat = material => {
+      material.side = THREE.DoubleSide;
+      return material;
+    };
+    const sclera = new THREE.Mesh(new THREE.SphereGeometry(1.18,64,28), eagleIvory);
+    sclera.scale.set(2.35,.58,.42);
     sclera.castShadow = true;
     eye.add(sclera);
-    const iris = new THREE.Mesh(new THREE.CircleGeometry(.62,48), makeMat(0x2ee6d6,.25,.08,.42));
-    iris.position.set(0,0,.6);
+
+    const upperShape = new THREE.Shape();
+    upperShape.moveTo(-2.82,.34);
+    upperShape.quadraticCurveTo(-.8,1.08,2.82,.48);
+    upperShape.lineTo(2.34,.09);
+    upperShape.quadraticCurveTo(.18,.62,-2.42,.06);
+    upperShape.closePath();
+    const upperBrow = new THREE.Mesh(new THREE.ShapeGeometry(upperShape,36), shapeMat(darkFeather.clone()));
+    upperBrow.position.z = .48;
+    upperBrow.castShadow = true;
+    eye.add(upperBrow);
+
+    const lowerShape = new THREE.Shape();
+    lowerShape.moveTo(-2.45,-.24);
+    lowerShape.quadraticCurveTo(-.2,-.94,2.36,-.26);
+    lowerShape.lineTo(2.03,-.56);
+    lowerShape.quadraticCurveTo(.12,-1.18,-2.12,-.54);
+    lowerShape.closePath();
+    const lowerLid = new THREE.Mesh(new THREE.ShapeGeometry(lowerShape,30), shapeMat(bronzeFeather.clone()));
+    lowerLid.position.z = .43;
+    lowerLid.castShadow = true;
+    eye.add(lowerLid);
+
+    const irisBack = new THREE.Mesh(new THREE.CircleGeometry(.78,72), makeMat(0x3c2511,.34,.1,.12));
+    irisBack.position.set(0,0,.53);
+    eye.add(irisBack);
+    const iris = new THREE.Mesh(new THREE.CircleGeometry(.66,72), amber);
+    iris.position.set(0,0,.56);
     eye.add(iris);
-    const pupil = new THREE.Mesh(new THREE.CircleGeometry(.26,40), makeMat(0x05070c,.32,.02));
-    pupil.position.set(0,0,.62);
+
+    const irisRing = new THREE.Mesh(new THREE.TorusGeometry(.71,.025,8,96), rimGold);
+    irisRing.position.z = .585;
+    eye.add(irisRing);
+    const innerRing = new THREE.Mesh(new THREE.TorusGeometry(.37,.018,8,72), makeGlowMat(0xffd166,.46));
+    innerRing.position.z = .6;
+    eye.add(innerRing);
+
+    for(let i=0;i<18;i++){
+      const a = i / 18 * Math.PI * 2;
+      const len = .52 + (i % 3) * .06;
+      const ray = addTube(
+        eye,
+        [Math.cos(a)*.18, Math.sin(a)*.18, .61],
+        [Math.cos(a)*len, Math.sin(a)*len, .61],
+        .011,
+        makeGlowMat(i % 2 ? 0xffd166 : 0xffffff, .38)
+      );
+      ray.castShadow = false;
+    }
+
+    const pupil = new THREE.Mesh(new THREE.CircleGeometry(.25,48), makeMat(0x030509,.22,.03,.05));
+    pupil.position.set(0,0,.63);
     eye.add(pupil);
-    const lid = new THREE.Mesh(new THREE.TorusGeometry(1.18,.055,12,96), bronze);
-    lid.scale.set(1.92,.52,.28);
-    lid.position.z = .08;
-    eye.add(lid);
-    const scan = new THREE.Mesh(new THREE.BoxGeometry(4.8,.07,.1), glow);
-    scan.position.set(0,.78,.72);
+    const highlight = new THREE.Mesh(new THREE.CircleGeometry(.11,24), makeGlowMat(0xffffff,.86));
+    highlight.position.set(-.22,.24,.65);
+    eye.add(highlight);
+
+    const cornea = new THREE.Mesh(new THREE.SphereGeometry(.82,48,18), glassy);
+    cornea.scale.set(1,.86,.18);
+    cornea.position.z = .58;
+    eye.add(cornea);
+
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(.36,.92,4), makeMat(0xc5923d,.34,.2,.1));
+    beak.position.set(.02,-1.08,.35);
+    beak.rotation.set(0,0,Math.PI);
+    beak.scale.z = .56;
+    beak.castShadow = true;
+    eye.add(beak);
+
+    for(let i=0;i<9;i++){
+      const x = (i - 4) * .43;
+      const feather = new THREE.Mesh(new THREE.ConeGeometry(.14,.92,4), i % 2 ? darkFeather : bronzeFeather);
+      feather.position.set(x,-.88 - Math.abs(i-4)*.035,.18);
+      feather.rotation.set(.18,0,(i-4)*-.12 + Math.PI);
+      feather.scale.set(1,.8 + Math.abs(i-4)*.06,.38);
+      feather.castShadow = true;
+      eye.add(feather);
+    }
+
+    const wingLeft = new THREE.Mesh(new THREE.ConeGeometry(.32,1.42,4), bronzeFeather);
+    wingLeft.position.set(-2.48,-.18,.12);
+    wingLeft.rotation.set(0,0,-1.05);
+    wingLeft.scale.set(.76,1,.34);
+    wingLeft.castShadow = true;
+    eye.add(wingLeft);
+    const wingRight = wingLeft.clone();
+    wingRight.position.x = 2.48;
+    wingRight.rotation.z = 1.05;
+    eye.add(wingRight);
+
+    const scan = new THREE.Mesh(new THREE.BoxGeometry(5.18,.055,.08), makeGlowMat(0x2ee6d6,.36));
+    scan.position.set(0,.74,.72);
+    scan.rotation.z = -.08;
     eye.add(scan);
+    const sight = new THREE.Mesh(new THREE.BoxGeometry(.06,1.9,.08), makeGlowMat(0xffd166,.26));
+    sight.position.set(.82,.18,.73);
+    sight.rotation.z = -.76;
+    eye.add(sight);
     group.add(eye);
     core = iris;
   }else if(ability.key === 'memory'){
@@ -1210,7 +1421,6 @@ function buildWorld(){
   center.castShadow = true;
   root.add(center);
 
-  buildWisdomTree();
   const centerLight = new THREE.PointLight(0x9fd8ff, 22, 34, 1.45);
   centerLight.position.set(0,5.4,0);
   root.add(centerLight);
@@ -1527,6 +1737,9 @@ function buildAvatar(){
   realModelRoot.add(realClothesRoot);
   const astronautKitRoot = createAstronautKit();
   astronautKitRoot.visible = false;
+  const styleKitRoot = createAvatarStyleKits();
+  styleKitRoot.visible = false;
+  realModelRoot.add(styleKitRoot);
   group.add(realModelRoot);
   const shirtMat = makeMat(0xdfe6eb,.44,.12,.03);
   const jacketMat = makeMat(0x4d5966,.48,.18,.025);
@@ -1698,9 +1911,21 @@ function buildAvatar(){
   }
   bodyRoot.add(curlyHair);
 
+  const nameLabel = makeTextSprite(sanitizeNickname(state.profile?.nickname), {
+    accent:'#9fd8ff',
+    width:420,
+    height:140,
+    scale:.52,
+    fontSize:58,
+    bg:'rgba(4,8,18,.76)'
+  });
+  nameLabel.position.set(0,2.92,0);
+  nameLabel.userData.kind = 'playerName';
+  group.add(nameLabel);
+
   group.position.set(0,0,5);
   return {
-    group, bodyRoot, realModelRoot, realClothesRoot, astronautKitRoot, torso, hips, head, chestPanel,
+    group, bodyRoot, realModelRoot, realClothesRoot, astronautKitRoot, styleKitRoot, nameLabel, torso, hips, head, chestPanel,
     leftShoulder, rightShoulder, leftArm, rightArm, leftHand, rightHand, leftLeg, rightLeg, leftShoe, rightShoe,
     shirtParts:[torso,leftShoulder,rightShoulder,leftArm,rightArm,chestPanel],
     pantsParts:[hips,leftLeg,rightLeg],
@@ -1716,8 +1941,119 @@ function buildAvatar(){
     activeClip:null,
     nativeStyle:false,
     astronautMode:false,
+    externalCharacterMode:false,
     walk:{phase:0, amount:0, bones:{}, baseRot:new Map()}
   };
+}
+
+function createAvatarStyleKits(){
+  const root = new THREE.Group();
+  const kits = {};
+  root.userData.kits = kits;
+  const roleColor = {base:0xe7edf2, accent:0x4aa8ff, trim:0xffffff, dark:0x162033, glow:0x83e8ff};
+  const kitMat = role => {
+    if(role === 'glow') return makeGlowMat(roleColor.glow,.45);
+    const emissive = role === 'accent' ? .12 : role === 'trim' ? .06 : .02;
+    const metal = role === 'dark' ? .18 : .1;
+    return makeMat(roleColor[role] || roleColor.accent, .4, metal, emissive);
+  };
+  const makeKit = key => {
+    const group = new THREE.Group();
+    group.visible = false;
+    group.userData.parts = [];
+    kits[key] = group;
+    root.add(group);
+    return group;
+  };
+  const add = (group, mesh, role='accent') => {
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData.role = role;
+    mesh.material = mesh.material || kitMat(role);
+    group.userData.parts.push(mesh);
+    group.add(mesh);
+    return mesh;
+  };
+  const box = (group, role, size, pos, rot=[0,0,0]) => {
+    const mesh = add(group, new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), kitMat(role)), role);
+    mesh.position.set(pos[0], pos[1], pos[2]);
+    mesh.rotation.set(rot[0], rot[1], rot[2]);
+    return mesh;
+  };
+  const capsule = (group, role, radius, length, pos, rot=[0,0,0], scale=[1,1,1]) => {
+    const mesh = add(group, new THREE.Mesh(new THREE.CapsuleGeometry(radius, length, 8, 18), kitMat(role)), role);
+    mesh.position.set(pos[0], pos[1], pos[2]);
+    mesh.rotation.set(rot[0], rot[1], rot[2]);
+    mesh.scale.set(scale[0], scale[1], scale[2]);
+    return mesh;
+  };
+  const ring = (group, role, radius, tubeRadius, pos, scale=[1,1,1]) => {
+    const mesh = add(group, new THREE.Mesh(new THREE.TorusGeometry(radius, tubeRadius, 8, 52), kitMat(role)), role);
+    mesh.position.set(pos[0], pos[1], pos[2]);
+    mesh.rotation.x = Math.PI/2;
+    mesh.scale.set(scale[0], scale[1], scale[2]);
+    return mesh;
+  };
+  const paired = (group, makePart) => [-1,1].forEach(side => makePart(side));
+  const baseSuit = group => {
+    capsule(group, 'base', .29, .56, [0,1.34,.045], [0,0,0], [1.08,.94,.44]);
+    capsule(group, 'dark', .18, .18, [0,.88,.035], [Math.PI/2,0,0], [1.45,.5,.54]);
+    ring(group, 'trim', .23, .014, [0,1.71,.055], [1.18,.42,.82]);
+    ring(group, 'dark', .31, .018, [0,.98,.045], [1.14,.2,.62]);
+    paired(group, side => {
+      capsule(group, 'base', .055, .32, [side*.38,1.42,.035], [0,0,side*.16], [.9,1,.76]);
+      capsule(group, 'dark', .06, .32, [side*.17,.58,.035], [0,0,side*.03], [.86,1,.74]);
+      box(group, 'dark', [.2,.085,.18], [side*.15,.14,.085], [.02,0,0]);
+    });
+  };
+
+  const explorer = makeKit('explorer');
+  baseSuit(explorer);
+  box(explorer, 'accent', [.12,.62,.034], [0,1.34,.315], [-.08,0,0]);
+  box(explorer, 'trim', [.44,.1,.036], [0,1.54,.318], [-.08,0,0]);
+  box(explorer, 'dark', [.22,.12,.04], [0,1.24,.322], [-.08,0,0]);
+  paired(explorer, side => {
+    box(explorer, 'accent', [.045,.46,.035], [side*.43,1.42,.235], [0,0,side*.08]);
+    box(explorer, 'accent', [.045,.5,.035], [side*.18,.58,.205], [0,0,side*.03]);
+    ring(explorer, 'trim', .09, .01, [side*.18,.82,.055], [.9,.18,.7]);
+  });
+
+  const scholar = makeKit('scholar');
+  baseSuit(scholar);
+  box(scholar, 'trim', [.5,.14,.038], [0,1.57,.315], [-.08,0,0]);
+  box(scholar, 'accent', [.07,.75,.04], [-.12,1.22,.32], [-.08,0,.28]);
+  box(scholar, 'accent', [.07,.62,.04], [.13,1.24,.32], [-.08,0,-.28]);
+  paired(scholar, side => {
+    box(scholar, 'trim', [.22,.07,.034], [side*.31,1.58,.25], [0,0,side*.12]);
+    box(scholar, 'base', [.15,.58,.034], [side*.24,.9,.285], [-.04,0,side*.08]);
+    box(scholar, 'accent', [.055,.36,.035], [side*.42,1.28,.235], [0,0,side*.1]);
+  });
+
+  const runner = makeKit('runner');
+  baseSuit(runner);
+  box(runner, 'dark', [.42,.42,.04], [0,1.36,.317], [-.08,0,0]);
+  box(runner, 'accent', [.08,.7,.045], [-.12,1.32,.325], [-.08,0,-.18]);
+  box(runner, 'trim', [.06,.52,.045], [.14,1.33,.326], [-.08,0,.18]);
+  paired(runner, side => {
+    box(runner, 'accent', [.24,.1,.04], [side*.38,1.6,.245], [0,0,side*.28]);
+    box(runner, 'glow', [.04,.54,.033], [side*.44,1.31,.245], [0,0,side*.02]);
+    box(runner, 'accent', [.065,.6,.04], [side*.19,.58,.21], [0,0,side*.04]);
+    box(runner, 'trim', [.19,.105,.045], [side*.15,.38,.22], [0,0,side*.05]);
+  });
+
+  const creator = makeKit('creator');
+  baseSuit(creator);
+  box(creator, 'base', [.48,.55,.04], [0,1.32,.318], [-.08,0,0]);
+  box(creator, 'accent', [.28,.1,.045], [-.12,1.56,.326], [-.08,0,.18]);
+  box(creator, 'accent', [.09,.68,.045], [.13,1.23,.326], [-.08,0,-.24]);
+  box(creator, 'dark', [.32,.105,.045], [0,.98,.315], [-.08,0,0]);
+  paired(creator, side => {
+    box(creator, side > 0 ? 'accent' : 'trim', [.055,.5,.036], [side*.41,1.34,.235], [0,0,side*.12]);
+    box(creator, 'base', [.16,.52,.038], [side*.2,.62,.205], [0,0,side*.04]);
+    box(creator, 'trim', [.18,.08,.04], [side*.16,.18,.19], [0,0,side*.05]);
+  });
+
+  return root;
 }
 
 function createAstronautKit(){
@@ -1928,6 +2264,63 @@ function collectRealAvatarParts(model){
   });
 }
 
+function applyMeshyAstronautFinish(model){
+  model.traverse(obj => {
+    if(!obj.isMesh) return;
+    obj.frustumCulled = false;
+    obj.geometry?.computeBoundingBox?.();
+    const bbox = obj.geometry?.boundingBox;
+    const min = bbox ? bbox.min.clone() : new THREE.Vector3(-1, 0, -1);
+    const size = bbox ? bbox.getSize(new THREE.Vector3()) : new THREE.Vector3(2, 2, 2);
+    const material = new THREE.MeshStandardMaterial({
+      name:'GGame_Meshy_Astronaut_Suit',
+      color:0xc7d5df,
+      roughness:.38,
+      metalness:.18,
+      emissive:0x032336,
+      emissiveIntensity:.06
+    });
+    material.onBeforeCompile = shader => {
+      shader.uniforms.uGGameMin = {value:min};
+      shader.uniforms.uGGameSize = {value:size};
+      shader.vertexShader = `varying vec3 vGGameLocalPos;\n${shader.vertexShader}`.replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\nvGGameLocalPos = position;'
+      );
+      shader.fragmentShader = `varying vec3 vGGameLocalPos;\nuniform vec3 uGGameMin;\nuniform vec3 uGGameSize;\n${shader.fragmentShader}`.replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        vec3 gPos = clamp((vGGameLocalPos - uGGameMin) / max(uGGameSize, vec3(0.001)), vec3(0.0), vec3(1.0));
+        float xSide = abs(gPos.x - 0.5);
+        vec3 suitWhite = vec3(0.66, 0.76, 0.84);
+        vec3 armorBlue = vec3(0.025, 0.075, 0.13);
+        vec3 bootNavy = vec3(0.025, 0.035, 0.055);
+        vec3 visorDark = vec3(0.00, 0.025, 0.055);
+        vec3 cyanTrim = vec3(0.00, 0.86, 0.96);
+        vec3 goldLock = vec3(0.88, 0.66, 0.28);
+        float boots = 1.0 - smoothstep(0.12, 0.28, gPos.y);
+        float backpack = (1.0 - smoothstep(0.08, 0.24, xSide)) * smoothstep(0.38, 0.50, gPos.y) * (1.0 - smoothstep(0.72, 0.86, gPos.y));
+        float sideArmor = smoothstep(0.18, 0.34, xSide) * smoothstep(0.16, 0.30, gPos.y) * (1.0 - smoothstep(0.78, 0.91, gPos.y));
+        float shoulderArmor = smoothstep(0.20, 0.34, xSide) * smoothstep(0.54, 0.64, gPos.y) * (1.0 - smoothstep(0.76, 0.88, gPos.y));
+        float helmet = smoothstep(0.70, 0.88, gPos.y);
+        float chestPanel = (1.0 - smoothstep(0.03, 0.13, xSide)) * smoothstep(0.42, 0.52, gPos.y) * (1.0 - smoothstep(0.62, 0.74, gPos.y));
+        float belt = smoothstep(0.43, 0.47, gPos.y) * (1.0 - smoothstep(0.52, 0.56, gPos.y));
+        float cuffs = smoothstep(0.30, 0.42, xSide) * smoothstep(0.34, 0.44, gPos.y) * (1.0 - smoothstep(0.53, 0.64, gPos.y));
+        float kneePads = smoothstep(0.18, 0.34, xSide) * smoothstep(0.24, 0.33, gPos.y) * (1.0 - smoothstep(0.42, 0.50, gPos.y));
+        vec3 astronautColor = suitWhite;
+        astronautColor = mix(astronautColor, armorBlue, clamp(backpack * 0.95 + sideArmor * 0.86 + shoulderArmor * 0.82 + belt * 0.70 + cuffs * 0.72 + kneePads * 0.75, 0.0, 1.0));
+        astronautColor = mix(astronautColor, bootNavy, boots * 0.92);
+        astronautColor = mix(astronautColor, visorDark, helmet * 0.38);
+        astronautColor = mix(astronautColor, cyanTrim, chestPanel * 0.82);
+        astronautColor = mix(astronautColor, goldLock, belt * 0.22);
+        diffuseColor.rgb = mix(diffuseColor.rgb, astronautColor, 0.98);`
+      );
+    };
+    obj.material = material;
+    obj.material.needsUpdate = true;
+  });
+}
+
 function findAvatarAction(kind){
   if(!avatar.animActions) return null;
   const keys = Object.keys(avatar.animActions);
@@ -1941,8 +2334,16 @@ function findAvatarAction(kind){
 }
 
 function setAvatarClip(kind, fade=.16){
-  const next = findAvatarAction(kind) || findAvatarAction(kind === 'run' ? 'walk' : 'idle');
-  if(!next || avatar.activeClip === next) return;
+  const fallbackKind = kind === 'run' ? 'walk' : kind === 'walk' ? 'run' : null;
+  const next = findAvatarAction(kind) || (fallbackKind ? findAvatarAction(fallbackKind) : null);
+  if(!next){
+    if(kind === 'idle' && avatar.activeClip){
+      avatar.activeClip.fadeOut(fade);
+      avatar.activeClip = null;
+    }
+    return;
+  }
+  if(avatar.activeClip === next) return;
   next.enabled = true;
   next.reset();
   next.setEffectiveWeight(1);
@@ -1966,6 +2367,39 @@ function setupAvatarAnimations(model, animations=[]){
     avatar.animActions[clip.name.toLowerCase()] = avatar.mixer.clipAction(clip);
   });
   setAvatarClip('idle', 0);
+}
+
+function updateAvatarNameLabel(){
+  if(!avatar?.group) return;
+  const name = sanitizeNickname(state.profile?.nickname);
+  if(avatar.nameLabel){
+    avatar.group.remove(avatar.nameLabel);
+    avatar.nameLabel.material?.map?.dispose?.();
+    avatar.nameLabel.material?.dispose?.();
+  }
+  const label = makeTextSprite(name, {
+    accent: state.avatar?.color || '#9fd8ff',
+    width:420,
+    height:140,
+    scale:.52,
+    fontSize:58,
+    bg:'rgba(4,8,18,.76)'
+  });
+  label.position.set(0,2.92,0);
+  label.userData.kind = 'playerName';
+  avatar.nameLabel = label;
+  avatar.group.add(label);
+}
+
+function updateProfileUi(){
+  const name = sanitizeNickname(state.profile?.nickname);
+  const bootName = document.getElementById('bootNickname');
+  const diyName = document.getElementById('nicknameInput');
+  if(bootName && document.activeElement !== bootName && bootName.value !== name) bootName.value = name;
+  if(diyName && document.activeElement !== diyName && diyName.value !== name) diyName.value = name;
+  document.querySelectorAll('#presetChoices button, #bootPresetChoices button').forEach(button => {
+    button.classList.toggle('active', button.dataset.value === state.profile.preset);
+  });
 }
 
 function setAvatarMorph(name, value){
@@ -1992,12 +2426,18 @@ function updateAvatarMorphs(t){
 }
 
 function loadRealAvatarModel(){
+  const modelUrl = getAvatarModelUrl();
+  const modelKind = getAvatarModelKind();
+  const loadToken = ++avatarModelLoadToken;
   const loader = new GLTFLoader();
   loader.setCrossOrigin?.('anonymous');
-  loader.load(REAL_AVATAR_MODEL, gltf => {
+  loader.load(modelUrl, gltf => {
+    if(loadToken !== avatarModelLoadToken) return;
     const model = gltf.scene;
-    avatar.nativeStyle = true;
-    avatar.astronautMode = REAL_AVATAR_MODEL.includes('avatar-animated');
+    const externalCharacter = modelUrl.includes('/characters/meshy-');
+    avatar.externalCharacterMode = externalCharacter;
+    avatar.nativeStyle = !externalCharacter;
+    avatar.astronautMode = !externalCharacter && modelUrl.includes('avatar-animated');
     model.traverse(obj => {
       if(obj.isMesh){
         obj.castShadow = true;
@@ -2020,11 +2460,15 @@ function loadRealAvatarModel(){
     model.position.x -= center.x;
     model.position.z -= center.z;
     model.position.y -= fitted.min.y;
-    model.rotation.y = Math.PI;
+    const meshyUserFacing = modelKind === 'astronaut' || modelKind === 'robot' || modelKind === 'titan' || modelKind === 'pencil' ? 0 : Math.PI;
+    model.rotation.y = externalCharacter ? meshyUserFacing : Math.PI;
+    if(externalCharacter && modelUrl.includes('meshy-male-astronaut-run')) applyMeshyAstronautFinish(model);
     avatar.realModelRoot.clear();
     avatar.realModelRoot.add(model);
     avatar.realModelRoot.add(avatar.astronautKitRoot);
-    avatar.astronautKitRoot.visible = true;
+    avatar.realModelRoot.add(avatar.styleKitRoot);
+    avatar.astronautKitRoot.visible = avatar.astronautMode;
+    avatar.styleKitRoot.visible = !externalCharacter;
     avatar.realClothesRoot.visible = false;
     avatar.realModelRoot.visible = true;
     avatar.bodyRoot.visible = false;
@@ -2034,19 +2478,51 @@ function loadRealAvatarModel(){
     bindAvatarBones();
     applyAvatarStyle();
   }, undefined, err => {
+    if(loadToken !== avatarModelLoadToken) return;
     console.warn('Real avatar model failed to load', err);
     avatar.realModelRoot.visible = false;
     avatar.realClothesRoot.visible = false;
     avatar.astronautKitRoot.visible = false;
+    avatar.styleKitRoot.visible = false;
     avatar.bodyRoot.visible = true;
     avatar.nativeStyle = false;
     avatar.astronautMode = false;
+    avatar.externalCharacterMode = false;
     toast('人物模型加载失败，已临时显示备用角色');
+  });
+}
+
+function updateAvatarStyleKit(){
+  if(!avatar?.styleKitRoot) return;
+  if(avatar.externalCharacterMode){
+    avatar.styleKitRoot.visible = false;
+    return;
+  }
+  const key = Object.prototype.hasOwnProperty.call(AVATAR_STYLE_PALETTES, state.profile?.preset) ? state.profile.preset : 'astronaut';
+  const palette = AVATAR_STYLE_PALETTES[key] || AVATAR_STYLE_PALETTES.astronaut;
+  const kits = avatar.styleKitRoot.userData.kits || {};
+  avatar.styleKitRoot.visible = Boolean(avatar.realModelRoot?.visible);
+  Object.entries(kits).forEach(([kitKey, kit]) => {
+    kit.visible = kitKey === key;
+    if(!kit.visible) return;
+    kit.traverse(obj => {
+      if(!obj.isMesh || !obj.material) return;
+      const role = obj.userData.role || 'accent';
+      const color = palette[role] ?? palette.accent;
+      obj.material.color?.set(color);
+      if(obj.material.emissive){
+        obj.material.emissive.set(color);
+        obj.material.emissiveIntensity = role === 'glow' ? .8 : role === 'accent' ? .16 : .05;
+      }
+      obj.material.needsUpdate = true;
+    });
   });
 }
 
 function applyAvatarStyle(){
   const color = new THREE.Color(state.avatar.color);
+  const styleKey = Object.prototype.hasOwnProperty.call(AVATAR_STYLE_PALETTES, state.profile?.preset) ? state.profile.preset : 'astronaut';
+  const stylePalette = AVATAR_STYLE_PALETTES[styleKey] || AVATAR_STYLE_PALETTES.astronaut;
   const fallbackVisible = !avatar.realModelRoot?.visible;
   const fallbackSuitColor = new THREE.Color(0xdfe6eb);
   const fallbackTrimColor = new THREE.Color(0x9fb0c6);
@@ -2117,13 +2593,18 @@ function applyAvatarStyle(){
     cloth.boot.forEach(part=>{ part.visible = state.avatar.shoes === 'boot'; });
   }
   if(avatar.realModelRoot?.visible){
-    if(avatar.nativeStyle){
+    if(avatar.externalCharacterMode){
+      avatar.astronautKitRoot.visible = false;
+      avatar.styleKitRoot.visible = false;
+      avatar.realMaterials.all.forEach(material => {
+        if(!material) return;
+        material.roughness = Math.min(1, material.roughness ?? .58);
+        material.metalness = material.metalness ?? 0;
+        material.needsUpdate = true;
+      });
+    }else if(avatar.nativeStyle){
       if(avatar.astronautMode){
-        const suitColor = state.avatar.suit === 'jacket'
-          ? new THREE.Color(0x9fb0c6)
-          : state.avatar.suit === 'coat'
-            ? new THREE.Color(0xf4f6f8)
-            : new THREE.Color(0xe7edf2);
+        const suitColor = new THREE.Color(stylePalette.suit);
         const visorColor = new THREE.Color(0x07111f);
         avatar.realMaterials.all.forEach(material => {
           const name = (material.name || '').toLowerCase();
@@ -2141,6 +2622,7 @@ function applyAvatarStyle(){
           material.needsUpdate = true;
         });
         avatar.astronautKitRoot.visible = true;
+        updateAvatarStyleKit();
         const accent = new THREE.Color(state.avatar.color).lerp(new THREE.Color(0x9fd8ff), .65);
         avatar.astronautKitRoot.traverse(obj => {
           if(!obj.isMesh || !obj.material) return;
@@ -2173,6 +2655,7 @@ function applyAvatarStyle(){
           if(material.emissive) material.emissive.copy(hairColor).multiplyScalar(.025);
         });
         updateAvatarMorphs(performance.now() / 1000);
+        updateAvatarStyleKit();
       }
     }
     const heightMap = {short:.92, mid:1, tall:1.1};
@@ -2182,6 +2665,8 @@ function applyAvatarStyle(){
       heightMap[state.avatar.height] || 1,
       buildMap[state.avatar.build] || 1
     );
+  }else{
+    updateAvatarStyleKit();
   }
 }
 
@@ -2223,11 +2708,11 @@ function updateAvatarAnimation(moving, dt, t){
     updateAvatarMorphs(t);
     const root = avatar.realModelRoot;
     if(avatar.mixer){
-      setAvatarClip(moving ? 'walk' : 'idle');
+      setAvatarClip(moving ? 'run' : 'idle');
       if(avatar.activeClip) avatar.activeClip.timeScale = moving ? 1.18 : 1;
       avatar.mixer.update(dt);
-      root.position.set(Math.sin(phase * .5) * .018 * amount, Math.abs(stride) * .035 * amount + Math.sin(t * 1.7) * .01 * idle, -.025 * amount);
-      root.rotation.set(-.055 * amount, 0, Math.sin(phase) * .014 * amount);
+      root.position.set(0, 0, 0);
+      root.rotation.set(0, 0, 0);
       if(avatarAction.name === 'jump'){
         root.position.y += Math.sin(Math.min(1, actionProgress) * Math.PI) * .42;
       }
@@ -2362,7 +2847,10 @@ function setupUi(){
   document.getElementById('radarToggle').onclick = () => document.getElementById('radarPanel').classList.toggle('showMobile');
   document.getElementById('soundToggle').onclick = toggleSound;
   const bootStart = document.getElementById('bootStart');
-  if(bootStart) bootStart.onclick = enterHub;
+  if(bootStart) bootStart.onclick = () => {
+    commitNickname(document.getElementById('bootNickname')?.value);
+    enterHub();
+  };
   document.getElementById('resetData').onclick = () => {
     localStorage.removeItem('ggame-hub-v1');
     location.reload();
@@ -2372,6 +2860,38 @@ function setupUi(){
   document.getElementById('closeGame').onclick = closeGame;
   document.getElementById('completeGame').onclick = () => completeGame(activeGame);
   document.getElementById('enterHint').onclick = () => openGame(focusedPortal?.game);
+
+  const bindNicknameInput = input => {
+    if(!input) return;
+    input.value = sanitizeNickname(state.profile.nickname);
+    input.addEventListener('input', () => {
+      const next = input.value.slice(0, 12);
+      if(input.value !== next) input.value = next;
+      state.profile.nickname = next || '玩家';
+      saveState();
+      updateAvatarNameLabel();
+    });
+    input.addEventListener('blur', () => commitNickname(input.value));
+    input.addEventListener('keydown', e => {
+      if(e.key === 'Enter') input.blur();
+    });
+  };
+  bindNicknameInput(document.getElementById('bootNickname'));
+  bindNicknameInput(document.getElementById('nicknameInput'));
+
+  makeChoice('presetChoices', Object.entries(AVATAR_PRESETS).map(([key, preset]) => [key, preset.label]), applyAvatarPreset);
+  const bootPresetBox = document.getElementById('bootPresetChoices');
+  if(bootPresetBox){
+    Object.entries(AVATAR_PRESETS).forEach(([key, preset]) => {
+      const b = document.createElement('button');
+      b.className = 'presetBtn';
+      b.type = 'button';
+      b.dataset.value = key;
+      b.innerHTML = `<span>${preset.label}</span><small>${preset.note}</small>`;
+      b.onclick = () => applyAvatarPreset(key);
+      bootPresetBox.appendChild(b);
+    });
+  }
 
   const colors = ['#4aa8ff','#a778ff','#ffd166','#2ee6d6','#ff7fca','#75e06f','#ff9d4d','#ffffff'];
   const swatches = document.getElementById('colorSwatches');
@@ -2383,6 +2903,7 @@ function setupUi(){
       state.avatar.color = c;
       saveState();
       applyAvatarStyle();
+      updateAvatarNameLabel();
       updateDiyActive();
     };
     swatches.appendChild(b);
@@ -2432,6 +2953,7 @@ function setupUi(){
   ], value => { state.avatar.shoes = value; saveState(); applyAvatarStyle(); updateDiyActive(); });
   makeChoice('actionChoices', Object.entries(AVATAR_ACTIONS).map(([key, spec]) => [key, spec.label]), triggerAvatarAction);
   updateDiyActive();
+  updateProfileUi();
   updateAbilityGrid();
 
   addEventListener('keydown', e => {
@@ -2788,6 +3310,7 @@ function makeChoice(id, entries, onPick){
 }
 function updateDiyActive(){
   const sameColor = (a,b) => new THREE.Color(a).getHexString() === new THREE.Color(b).getHexString();
+  updateProfileUi();
   document.querySelectorAll('#colorSwatches .swatch').forEach(b=>b.classList.toggle('active', sameColor(b.style.backgroundColor, state.avatar.color)));
   document.querySelectorAll('#skinSwatches .swatch').forEach(b=>b.classList.toggle('active', sameColor(b.style.backgroundColor, state.avatar.skin || '#d9a982')));
   document.querySelectorAll('#faceChoices button').forEach(b=>b.classList.toggle('active', b.dataset.value === state.avatar.face));
@@ -2960,6 +3483,15 @@ function openGame(game){
   gameUrl.searchParams.set('from', 'ggame-hub');
   window.location.assign(gameUrl.href);
 }
+function openLinkedGameFromHub(){
+  const params = new URLSearchParams(location.search);
+  const requested = params.get('open') || params.get('game') || params.get('play');
+  if(!requested) return;
+  const key = requested.trim().toLowerCase();
+  const game = GAMES.find(item => item.id.toLowerCase() === key || item.name.toLowerCase() === key);
+  if(game) openGame(game);
+  else toast('没有找到游戏：' + requested);
+}
 function closeGame(){
   document.getElementById('gameDock').classList.remove('show');
   document.getElementById('gameFrame').src = 'about:blank';
@@ -3027,6 +3559,33 @@ function lerpAngle(a, b, t){
   return a + diff * t;
 }
 
+function steppedCircleHeight(x, z, cx, cz, radius, height, edge=.45){
+  const d = Math.hypot(x - cx, z - cz);
+  if(d >= radius + edge) return 0;
+  if(d <= radius - edge) return height;
+  const t = 1 - (d - (radius - edge)) / (edge * 2);
+  const eased = Math.max(0, Math.min(1, t));
+  return height * eased * eased * (3 - 2 * eased);
+}
+
+function sampleWalkSurfaceHeight(x, z){
+  let h = 0;
+  h = Math.max(h, steppedCircleHeight(x, z, 0, 0, 5.18, .34, .72));
+  ABILITIES.forEach((ability, i)=>{
+    const angle = i / ABILITIES.length * Math.PI * 2 - Math.PI / 2;
+    const cx = Math.cos(angle) * 22;
+    const cz = Math.sin(angle) * 22;
+    h = Math.max(h, steppedCircleHeight(x, z, cx, cz, 6.45, .28, .9));
+    h = Math.max(h, steppedCircleHeight(x, z, cx, cz, 4.45, .42, .52));
+  });
+  portals.forEach(portal => {
+    portal.group.getWorldPosition(walkSurfaceTemp);
+    h = Math.max(h, steppedCircleHeight(x, z, walkSurfaceTemp.x, walkSurfaceTemp.z, 1.86, .38, .44));
+    h = Math.max(h, steppedCircleHeight(x, z, walkSurfaceTemp.x, walkSurfaceTemp.z, 1.34, .66, .32));
+  });
+  return h;
+}
+
 function updateMovement(dt){
   const dir = new THREE.Vector3();
   const {forward, right} = getScreenMoveBasis();
@@ -3048,21 +3607,24 @@ function updateMovement(dt){
     avatar.group.position.z = Math.max(-30, Math.min(30, avatar.group.position.z));
     avatar.group.rotation.y = lerpAngle(avatar.group.rotation.y, Math.atan2(dir.x, dir.z), 1 - Math.exp(-dt * 12));
   }
+  const surfaceY = sampleWalkSurfaceHeight(avatar.group.position.x, avatar.group.position.z);
+  avatar.group.position.y += (surfaceY - avatar.group.position.y) * (1 - Math.exp(-dt * 10.5));
   updateFootsteps(avatarMoving, dt);
   if(introOrbit){
     yaw += dt * .16;
     pitch = .78;
-    avatar.group.position.lerp(new THREE.Vector3(0,0,3.5), .04);
+    const introY = sampleWalkSurfaceHeight(0, 3.5);
+    avatar.group.position.lerp(new THREE.Vector3(0,introY,3.5), .04);
   }
   const radius = introOrbit ? 16.5 : 8.4;
   const height = introOrbit ? 11.2 : 5.6 + pitch * 3.6;
   const desired = new THREE.Vector3(
     avatar.group.position.x - Math.sin(yaw) * radius,
-    height,
+    height + avatar.group.position.y,
     avatar.group.position.z - Math.cos(yaw) * radius
   );
   camera.position.lerp(desired, 1 - Math.pow(.001, dt));
-  camera.lookAt(avatar.group.position.x, 1.45, avatar.group.position.z);
+  camera.lookAt(avatar.group.position.x, avatar.group.position.y + 1.45, avatar.group.position.z);
 }
 
 function updatePortals(t){

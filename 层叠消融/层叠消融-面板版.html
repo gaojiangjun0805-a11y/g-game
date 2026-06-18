@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>层叠消融</title>
+<style>
+  :root{
+    --bg:#171616;
+    --panel:#242220;
+    --panel2:#2d2925;
+    --line:rgba(255,244,220,.14);
+    --text:#fff4dc;
+    --muted:#b7aa94;
+    --gold:#f0b65b;
+    --teal:#5fc8b5;
+    --green:#7bd88f;
+    --red:#dc6b5d;
+    --violet:#a88adf;
+    --cell:#38342f;
+  }
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;min-height:100%;overflow-x:hidden;}
+  body{
+    min-height:100dvh;
+    color:var(--text);
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,Segoe UI,sans-serif;
+    background:
+      radial-gradient(900px 640px at 15% -12%,rgba(240,182,91,.18),transparent 58%),
+      radial-gradient(760px 700px at 110% 116%,rgba(95,200,181,.16),transparent 52%),
+      linear-gradient(155deg,#171616,#211a17 52%,#111715);
+    padding:18px;
+  }
+
+  button{font:inherit;touch-action:manipulation;}
+
+  .app{
+    width:min(1180px,100%);
+    margin:0 auto;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+
+  header{
+    display:grid;
+    grid-template-columns:minmax(230px,1fr) minmax(320px,440px);
+    gap:14px;
+    align-items:end;
+  }
+
+  h1{
+    margin:0;
+    font-size:clamp(34px,5.5vw,60px);
+    line-height:.95;
+    letter-spacing:0;
+    color:#ffe7b1;
+    text-shadow:0 8px 32px rgba(240,182,91,.22);
+  }
+
+  .rule-line{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:10px;
+    color:var(--muted);
+    font-size:13px;
+    font-weight:800;
+  }
+
+  .rule-chip{
+    min-height:28px;
+    display:inline-flex;
+    align-items:center;
+    padding:4px 10px;
+    border:1px solid rgba(240,182,91,.28);
+    border-radius:999px;
+    background:rgba(240,182,91,.08);
+    color:#ffe2a1;
+  }
+
+  .top-stats{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:8px;
+  }
+
+  .stat{
+    min-width:0;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:9px 8px;
+    background:rgba(255,244,220,.055);
+    text-align:center;
+  }
+
+  .stat span{
+    display:block;
+    color:var(--muted);
+    font-size:11px;
+    font-weight:800;
+  }
+
+  .stat strong{
+    display:block;
+    margin-top:4px;
+    color:#ffe0a0;
+    font-size:22px;
+    line-height:1;
+    font-weight:900;
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+  }
+
+  .layout{
+    display:grid;
+    grid-template-columns:minmax(0,790px) 320px;
+    gap:14px;
+    align-items:start;
+  }
+
+  .stage,.side{
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:rgba(255,244,220,.052);
+    box-shadow:0 22px 70px rgba(0,0,0,.32);
+  }
+
+  .stage{padding:10px;min-width:0;}
+
+  #game{
+    display:block;
+    width:100%;
+    aspect-ratio:39/32;
+    border-radius:6px;
+    background:#1a1816;
+    touch-action:none;
+    cursor:grab;
+  }
+
+  #game:active{cursor:grabbing;}
+
+  .side{
+    padding:12px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  .section-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    color:#ffe1a0;
+    font-size:13px;
+    font-weight:900;
+  }
+
+  .level-grid{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:7px;
+  }
+
+  .level-btn,.ctrl-btn{
+    border:1px solid rgba(255,244,220,.14);
+    border-radius:8px;
+    color:var(--text);
+    background:rgba(0,0,0,.18);
+    cursor:pointer;
+    transition:transform .08s ease,border-color .16s ease,background .16s ease,color .16s ease;
+  }
+
+  .level-btn{
+    height:40px;
+    font-size:18px;
+    font-weight:900;
+  }
+
+  .level-btn.active{
+    color:#2b1a10;
+    border-color:#ffd37a;
+    background:linear-gradient(155deg,#ffe5a8,var(--gold));
+  }
+
+  .target-box{
+    padding:8px;
+    border:1px solid rgba(240,182,91,.18);
+    border-radius:8px;
+    background:linear-gradient(145deg,rgba(240,182,91,.08),rgba(0,0,0,.14));
+  }
+
+  #targetCanvas{
+    width:100%;
+    aspect-ratio:1/1;
+    display:block;
+    border-radius:6px;
+    background:#211d19;
+  }
+
+  .target-meta{
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:8px;
+    align-items:center;
+    margin-top:8px;
+  }
+
+  .target-meta strong{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color:#ffe1a0;
+    font-size:15px;
+  }
+
+  .target-meta span{
+    color:var(--muted);
+    font-size:12px;
+    font-weight:800;
+  }
+
+  .selected{
+    min-height:46px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:9px 10px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:rgba(0,0,0,.15);
+    color:#f8e8c8;
+    font-size:13px;
+    font-weight:900;
+  }
+
+  .selected i{
+    width:20px;
+    height:20px;
+    flex:0 0 auto;
+    border-radius:5px;
+    box-shadow:0 0 0 1px rgba(255,255,255,.25) inset;
+  }
+
+  .controls{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:8px;
+  }
+
+  .ctrl-btn{
+    min-height:42px;
+    padding:8px 10px;
+    font-size:14px;
+    font-weight:900;
+  }
+
+  .ctrl-btn.primary{
+    color:#24170f;
+    background:linear-gradient(155deg,#ffe5a8,var(--gold));
+    border-color:#ffd37a;
+  }
+
+  .ctrl-btn:active,.level-btn:active{transform:translateY(1px) scale(.98);}
+  .ctrl-btn:hover,.level-btn:hover{border-color:rgba(240,182,91,.58);}
+
+  .legend{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:7px;
+  }
+
+  .legend div{
+    min-height:32px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:var(--muted);
+    font-size:12px;
+    font-weight:800;
+  }
+
+  .swatch{
+    width:17px;
+    height:17px;
+    border-radius:4px;
+    border:1px solid rgba(255,244,220,.22);
+    flex:0 0 auto;
+  }
+
+  .toast{
+    position:fixed;
+    left:50%;
+    bottom:24px;
+    transform:translate(-50%,14px);
+    max-width:min(460px,calc(100vw - 32px));
+    padding:12px 16px;
+    border-radius:999px;
+    background:rgba(23,22,22,.94);
+    border:1px solid rgba(240,182,91,.32);
+    color:#ffe1a0;
+    font-size:14px;
+    font-weight:900;
+    box-shadow:0 18px 60px rgba(0,0,0,.4);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .18s ease,transform .18s ease;
+    z-index:20;
+  }
+
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+
+  .modal{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    background:rgba(15,13,12,.72);
+    z-index:30;
+  }
+
+  .modal.show{display:flex;}
+
+  .modal-card{
+    width:min(410px,100%);
+    border:1px solid rgba(240,182,91,.48);
+    border-radius:8px;
+    background:linear-gradient(155deg,#2b211a,#161515);
+    box-shadow:0 28px 90px rgba(0,0,0,.58);
+    padding:24px;
+    text-align:center;
+  }
+
+  .modal-card h2{
+    margin:0 0 8px;
+    color:#ffe0a0;
+    font-size:30px;
+  }
+
+  .modal-card p{
+    margin:0 0 18px;
+    color:var(--muted);
+    font-size:14px;
+    line-height:1.65;
+  }
+
+  .stars{
+    margin:6px 0 12px;
+    color:#ffc75a;
+    font-size:28px;
+    line-height:1;
+    letter-spacing:2px;
+    text-shadow:0 0 18px rgba(240,182,91,.45);
+  }
+
+  .modal-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+
+  @media (max-width:980px){
+    body{padding:12px;}
+    header,.layout{grid-template-columns:1fr;}
+    .top-stats{grid-template-columns:repeat(4,minmax(0,1fr));}
+    .side{order:2;}
+  }
+
+  @media (max-width:560px){
+    body{padding:10px;}
+    .app{gap:10px;}
+    .top-stats{grid-template-columns:repeat(2,1fr);}
+    .stage,.side{padding:8px;}
+    .controls{grid-template-columns:1fr 1fr;}
+    .modal-actions{grid-template-columns:1fr;}
+  }
+</style>
+<style id="touchGuardStyle">
+  html, body, body *{
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-touch-callout:none;
+  }
+  img, svg, canvas{
+    -webkit-user-drag:none;
+    user-drag:none;
+  }
+  input, textarea, [contenteditable="true"]{
+    -webkit-user-select:text;
+    user-select:text;
+    -webkit-touch-callout:default;
+  }
+</style>
+<style id="hubReturnStyle">
+  #hubReturnBtn{
+    position:fixed;
+    left:max(10px, env(safe-area-inset-left));
+    top:max(10px, env(safe-area-inset-top));
+    z-index:2147483000;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:74px;
+    height:34px;
+    padding:0 12px;
+    border-radius:999px;
+    border:1px solid rgba(159,216,255,.48);
+    background:rgba(6,12,24,.74);
+    color:#f3f7ff;
+    box-shadow:0 10px 30px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.12);
+    -webkit-backdrop-filter:blur(12px);
+    backdrop-filter:blur(12px);
+    font:900 13px/1 "PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    letter-spacing:0;
+    text-decoration:none;
+    pointer-events:auto;
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-touch-callout:none;
+    transition:transform .12s ease, border-color .16s ease, background .16s ease;
+  }
+  #hubReturnBtn:active{transform:scale(.96);border-color:rgba(46,230,214,.78);background:rgba(18,34,58,.82)}
+  @media (max-width:640px){#hubReturnBtn{height:30px;min-width:66px;padding:0 9px;font-size:12px}}
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>层叠消融</h1>
+        <div class="rule-line">
+          <span class="rule-chip">奇数叠加保留</span>
+          <span class="rule-chip">偶数叠加消融</span>
+          <span id="levelRule">有限图形拼目标</span>
+        </div>
+      </div>
+      <div class="top-stats">
+        <div class="stat"><span>差异</span><strong id="diffText">0</strong></div>
+        <div class="stat"><span>完成</span><strong id="matchText">0%</strong></div>
+        <div class="stat"><span>步数</span><strong id="moveText">0</strong></div>
+        <div class="stat"><span>用时</span><strong id="timeText">00:00</strong></div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="stage">
+        <canvas id="game" width="780" height="640" aria-label="层叠消融棋盘"></canvas>
+      </section>
+
+      <aside class="side">
+        <div class="section-title">
+          <span>关卡</span>
+          <span id="pieceText">0 件</span>
+        </div>
+        <div class="level-grid" id="levelGrid"></div>
+
+        <div class="section-title">
+          <span>目标图形</span>
+          <span id="targetSize">—</span>
+        </div>
+        <div class="target-box">
+          <canvas id="targetCanvas" width="300" height="300" aria-label="目标图形"></canvas>
+          <div class="target-meta">
+            <strong id="targetName">—</strong>
+            <span id="bestText">最佳 —</span>
+          </div>
+        </div>
+
+        <div class="section-title">
+          <span>选中图形</span>
+          <span id="shapeStatus">—</span>
+        </div>
+        <div class="selected">
+          <i id="selectedColor"></i>
+          <span id="selectedName">从下方取图形</span>
+        </div>
+
+        <div class="controls">
+          <button class="ctrl-btn" id="rotBtn" type="button">右转</button>
+          <button class="ctrl-btn" id="flipBtn" type="button">翻面</button>
+          <button class="ctrl-btn" id="undoBtn" type="button">撤销</button>
+          <button class="ctrl-btn" id="hintBtn" type="button">提示</button>
+          <button class="ctrl-btn" id="resetBtn" type="button">重置</button>
+          <button class="ctrl-btn primary" id="nextBtn" type="button">下一关</button>
+        </div>
+
+        <div class="legend">
+          <div><span class="swatch" style="background:#4fbeaa"></span><span>已匹配</span></div>
+          <div><span class="swatch" style="background:#dc6b5d"></span><span>多出来</span></div>
+          <div><span class="swatch" style="background:#f0b65b"></span><span>还缺少</span></div>
+          <div><span class="swatch" style="background:#a88adf"></span><span>将消融</span></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="modal" id="winModal" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div class="modal-card">
+      <h2 id="winTitle">目标完成</h2>
+      <div class="stars" id="winStars">★★★</div>
+      <p id="winCopy">层叠结果与目标一致。</p>
+      <div class="modal-actions">
+        <button class="ctrl-btn" id="againBtn" type="button">再玩一次</button>
+        <button class="ctrl-btn primary" id="modalNextBtn" type="button">下一关</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const targetCanvas = document.getElementById('targetCanvas');
+  const tctx = targetCanvas.getContext('2d');
+
+  const diffText = document.getElementById('diffText');
+  const matchText = document.getElementById('matchText');
+  const moveText = document.getElementById('moveText');
+  const timeText = document.getElementById('timeText');
+  const levelGrid = document.getElementById('levelGrid');
+  const pieceText = document.getElementById('pieceText');
+  const targetSize = document.getElementById('targetSize');
+  const targetName = document.getElementById('targetName');
+  const bestText = document.getElementById('bestText');
+  const selectedColor = document.getElementById('selectedColor');
+  const selectedName = document.getElementById('selectedName');
+  const shapeStatus = document.getElementById('shapeStatus');
+  const winModal = document.getElementById('winModal');
+  const winStars = document.getElementById('winStars');
+  const winCopy = document.getElementById('winCopy');
+  const toast = document.getElementById('toast');
+
+  const palette = ['#f0b65b','#5fc8b5','#dc6b5d','#8fcf75','#a88adf','#7fa7e6','#e4c064'];
+  const W = 780;
+  const H = 640;
+
+  function rows(pattern){
+    const cells = [];
+    pattern.forEach((row,y) => {
+      [...row].forEach((ch,x) => {
+        if(ch === '#') cells.push([x,y]);
+      });
+    });
+    return cells;
+  }
+
+  function rect(w,h){
+    const cells = [];
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++) cells.push([x,y]);
+    return cells;
+  }
+
+  function piece(name,cells,solution,colorIndex){
+    return {name,cells,solution,color:palette[colorIndex % palette.length]};
+  }
+
+  const library = {
+    square5:rect(5,5),
+    square4:rect(4,4),
+    square3:rect(3,3),
+    square2:rect(2,2),
+    bar5:rect(5,1),
+    bar4:rect(4,1),
+    bar3:rect(3,1),
+    bar2:rect(2,1),
+    tri4:rows(['#...','##..','###.','####']),
+    tri3:rows(['#..','##.','###']),
+    elbow:rows(['#..','#..','###']),
+    step:rows(['##.','.##','..#']),
+    diamond:rows(['.#.','###','.#.']),
+    cap:rows(['.###.','#####','#####','.###.']),
+    hook:rows(['###','#..','#..','##.'])
+  };
+
+  const levels = [
+    {
+      icon:'1',
+      name:'空心窗',
+      size:7,
+      par:2,
+      pieces:[
+        piece('大方板',library.square5,{x:1,y:1,r:0,f:false},0),
+        piece('内方板',library.square3,{x:2,y:2,r:0,f:false},1)
+      ]
+    },
+    {
+      icon:'2',
+      name:'阶梯门',
+      size:8,
+      par:3,
+      pieces:[
+        piece('左方板',library.square4,{x:1,y:1,r:0,f:false},0),
+        piece('右方板',library.square4,{x:3,y:3,r:0,f:false},1),
+        piece('横梁',library.bar5,{x:1,y:6,r:0,f:false},2)
+      ]
+    },
+    {
+      icon:'3',
+      name:'钥匙孔',
+      size:8,
+      par:4,
+      pieces:[
+        piece('圆心块',library.diamond,{x:1,y:1,r:0,f:false},0),
+        piece('消融芯',library.square2,{x:2,y:2,r:0,f:false},1),
+        piece('长柄',library.bar5,{x:3,y:3,r:0,f:false},2),
+        piece('齿块',library.bar2,{x:6,y:4,r:1,f:false},3)
+      ]
+    },
+    {
+      icon:'4',
+      name:'斜翼',
+      size:9,
+      par:5,
+      pieces:[
+        piece('左三角',library.tri4,{x:1,y:2,r:0,f:false},0),
+        piece('右三角',library.tri4,{x:4,y:2,r:2,f:true},1),
+        piece('中心片',library.square3,{x:3,y:3,r:0,f:false},2),
+        piece('消融片',library.square2,{x:4,y:4,r:0,f:false},3),
+        piece('尾钩',library.elbow,{x:1,y:5,r:1,f:false},4)
+      ]
+    },
+    {
+      icon:'5',
+      name:'迷宫印',
+      size:9,
+      par:6,
+      pieces:[
+        piece('顶盖',library.cap,{x:2,y:1,r:0,f:false},0),
+        piece('底盖',library.cap,{x:2,y:5,r:2,f:false},1),
+        piece('左钩',library.hook,{x:1,y:2,r:0,f:false},2),
+        piece('右钩',library.hook,{x:5,y:2,r:2,f:true},3),
+        piece('中心擦',library.square3,{x:3,y:3,r:0,f:false},4),
+        piece('斜阶',library.step,{x:4,y:4,r:0,f:false},5)
+      ]
+    }
+  ];
+
+  const state = {
+    levelIndex:0,
+    pieces:[],
+    target:[],
+    selectedId:null,
+    drag:null,
+    hover:null,
+    hint:null,
+    history:[],
+    moves:0,
+    startedAt:performance.now(),
+    completedAt:null,
+    won:false,
+    toastTimer:null,
+    particles:[],
+    renderPieces:[]
+  };
+
+  const layout = {
+    board:{x:42,y:64,size:0,cell:0},
+    tray:{x:42,y:0,w:0,h:0},
+  };
+
+  function transformCells(cells,r,flip){
+    const rotated = cells.map(([x,y]) => {
+      let nx = flip ? -x : x;
+      let ny = y;
+      for(let i=0;i<r;i++){
+        const tx = nx;
+        nx = ny;
+        ny = -tx;
+      }
+      return [nx,ny];
+    });
+    const minX = Math.min(...rotated.map(c => c[0]));
+    const minY = Math.min(...rotated.map(c => c[1]));
+    return rotated.map(([x,y]) => [x - minX, y - minY]);
+  }
+
+  function bounds(cells){
+    return {
+      w:Math.max(...cells.map(c => c[0])) + 1,
+      h:Math.max(...cells.map(c => c[1])) + 1
+    };
+  }
+
+  function cloneLevelPiece(p,index){
+    return {
+      id:'p' + index,
+      name:p.name,
+      cells:p.cells.map(c => [...c]),
+      color:p.color,
+      placed:false,
+      x:0,
+      y:0,
+      r:0,
+      f:false,
+      solution:{...p.solution}
+    };
+  }
+
+  function currentLevel(){
+    return levels[state.levelIndex];
+  }
+
+  function pieceCells(p,override){
+    const r = override?.r ?? p.r;
+    const f = override?.f ?? p.f;
+    return transformCells(p.cells,r,f);
+  }
+
+  function occupied(p,override){
+    const x = override?.x ?? p.x;
+    const y = override?.y ?? p.y;
+    return pieceCells(p,override).map(([cx,cy]) => [x + cx, y + cy]);
+  }
+
+  function emptyGrid(size){
+    return Array.from({length:size},() => Array(size).fill(0));
+  }
+
+  function xorCells(size,placements){
+    const counts = emptyGrid(size);
+    placements.forEach(({piece,override}) => {
+      occupied(piece,override).forEach(([x,y]) => {
+        if(x >= 0 && y >= 0 && x < size && y < size) counts[y][x] += 1;
+      });
+    });
+    return counts;
+  }
+
+  function computeTarget(){
+    const level = currentLevel();
+    return xorCells(level.size, level.pieces.map((p,index) => ({
+      piece:cloneLevelPiece(p,index),
+      override:p.solution
+    }))).map(row => row.map(v => v % 2));
+  }
+
+  function boardCounts(excludeId, preview){
+    const level = currentLevel();
+    const placements = state.pieces
+      .filter(p => p.placed && p.id !== excludeId)
+      .map(p => ({piece:p}));
+    if(preview) placements.push(preview);
+    return xorCells(level.size,placements);
+  }
+
+  function isInside(p,placement){
+    const level = currentLevel();
+    return occupied(p,placement).every(([x,y]) => x >= 0 && y >= 0 && x < level.size && y < level.size);
+  }
+
+  function samePlacement(a,b){
+    return a.placed === b.placed && a.x === b.x && a.y === b.y && a.r === b.r && a.f === b.f;
+  }
+
+  function snapshot(){
+    return state.pieces.map(p => ({id:p.id,placed:p.placed,x:p.x,y:p.y,r:p.r,f:p.f}));
+  }
+
+  function restore(snap){
+    snap.forEach(saved => {
+      const p = state.pieces.find(piece => piece.id === saved.id);
+      if(p) Object.assign(p,saved);
+    });
+    state.selectedId = snap.find(s => s.id === state.selectedId)?.id || state.pieces[0]?.id || null;
+  }
+
+  function loadLevel(index){
+    state.levelIndex = (index + levels.length) % levels.length;
+    state.pieces = currentLevel().pieces.map(cloneLevelPiece);
+    state.target = computeTarget();
+    state.selectedId = state.pieces[0]?.id || null;
+    state.drag = null;
+    state.hover = null;
+    state.hint = null;
+    state.history = [];
+    state.moves = 0;
+    state.startedAt = performance.now();
+    state.completedAt = null;
+    state.won = false;
+    state.particles = [];
+    winModal.classList.remove('show');
+    updateSide();
+    drawTarget();
+    requestDraw();
+  }
+
+  function selectedPiece(){
+    return state.pieces.find(p => p.id === state.selectedId) || null;
+  }
+
+  function elapsed(){
+    if(state.completedAt != null) return state.completedAt;
+    return Math.max(0,Math.floor((performance.now() - state.startedAt) / 1000));
+  }
+
+  function formatTime(s){
+    return String(Math.floor(s / 60)).padStart(2,'0') + ':' + String(s % 60).padStart(2,'0');
+  }
+
+  function diffInfo(){
+    const level = currentLevel();
+    const counts = boardCounts();
+    let diff = 0;
+    let match = 0;
+    const total = level.size * level.size;
+    for(let y=0;y<level.size;y++){
+      for(let x=0;x<level.size;x++){
+        const current = counts[y][x] % 2;
+        const target = state.target[y][x];
+        if(current === target) match += 1;
+        else diff += 1;
+      }
+    }
+    return {diff,match:Math.round(match / total * 100)};
+  }
+
+  function pieceSolved(p){
+    const s = p.solution;
+    return p.placed && p.x === s.x && p.y === s.y && p.r === s.r && p.f === s.f;
+  }
+
+  function starCount(){
+    let stars = 3;
+    if(state.moves > currentLevel().par + 2) stars -= 1;
+    if(elapsed() > 90) stars -= 1;
+    if(state.history.length > currentLevel().pieces.length + 4) stars -= 1;
+    return Math.max(1,stars);
+  }
+
+  function starString(count){
+    return '★'.repeat(count) + '☆'.repeat(3 - count);
+  }
+
+  function updateStats(){
+    const info = diffInfo();
+    diffText.textContent = String(info.diff);
+    matchText.textContent = info.match + '%';
+    moveText.textContent = String(state.moves);
+    timeText.textContent = formatTime(elapsed());
+    if(info.diff === 0 && !state.won) completeLevel();
+  }
+
+  function updateSide(){
+    const level = currentLevel();
+    pieceText.textContent = state.pieces.length + ' 件';
+    targetSize.textContent = level.size + '×' + level.size;
+    targetName.textContent = level.name;
+    bestText.textContent = bestFor(level.name);
+    Array.from(levelGrid.children).forEach((btn,index) => btn.classList.toggle('active',index === state.levelIndex));
+    const p = selectedPiece();
+    if(p){
+      selectedColor.style.background = p.color;
+      selectedName.textContent = p.name;
+      shapeStatus.textContent = p.placed ? '已入场' : '待放置';
+    }else{
+      selectedColor.style.background = 'transparent';
+      selectedName.textContent = '从下方取图形';
+      shapeStatus.textContent = '—';
+    }
+  }
+
+  function bestFor(name){
+    const best = JSON.parse(localStorage.getItem('dissolve-stack-best') || '{}');
+    return best[name] ? ('最佳 ' + best[name]) : '最佳 —';
+  }
+
+  function saveBest(score){
+    const key = 'dissolve-stack-best';
+    const best = JSON.parse(localStorage.getItem(key) || '{}');
+    const name = currentLevel().name;
+    if(!best[name] || score > best[name]){
+      best[name] = score;
+      localStorage.setItem(key,JSON.stringify(best));
+    }
+    bestText.textContent = bestFor(name);
+  }
+
+  function pushMove(oldSnap){
+    state.history.push(oldSnap);
+    state.moves += 1;
+    state.won = false;
+    winModal.classList.remove('show');
+    updateSide();
+    updateStats();
+    requestDraw();
+  }
+
+  function completeLevel(){
+    state.won = true;
+    state.completedAt = elapsed();
+    const stars = starCount();
+    const score = Math.max(100, 360 - state.moves * 12 - state.completedAt * 2 + stars * 40);
+    saveBest(score);
+    winStars.textContent = starString(stars);
+    winCopy.textContent = currentLevel().name + '：' + state.moves + ' 步 · ' + formatTime(state.completedAt) + ' · 得分 ' + score;
+    spawnBurst(layout.board.x + layout.board.size / 2, layout.board.y + layout.board.size / 2, '#f0b65b', 46);
+    winModal.classList.add('show');
+  }
+
+  function showToast(text){
+    clearTimeout(state.toastTimer);
+    toast.textContent = text;
+    toast.classList.add('show');
+    state.toastTimer = setTimeout(() => toast.classList.remove('show'), 1400);
+  }
+
+  function calcLayout(){
+    const level = currentLevel();
+    layout.board.cell = Math.floor(Math.min(54,(W - 120) / level.size));
+    layout.board.size = layout.board.cell * level.size;
+    layout.board.x = 42;
+    layout.board.y = 58;
+    layout.tray.x = 42;
+    layout.tray.y = layout.board.y + layout.board.size + 34;
+    layout.tray.w = W - 84;
+    layout.tray.h = H - layout.tray.y - 22;
+  }
+
+  function roundedRect(c,x,y,w,h,r){
+    const rr = Math.min(r,w/2,h/2);
+    c.beginPath();
+    c.moveTo(x+rr,y);
+    c.lineTo(x+w-rr,y);
+    c.quadraticCurveTo(x+w,y,x+w,y+rr);
+    c.lineTo(x+w,y+h-rr);
+    c.quadraticCurveTo(x+w,y+h,x+w-rr,y+h);
+    c.lineTo(x+rr,y+h);
+    c.quadraticCurveTo(x,y+h,x,y+h-rr);
+    c.lineTo(x,y+rr);
+    c.quadraticCurveTo(x,y,x+rr,y);
+    c.closePath();
+  }
+
+  function drawGridCell(c,x,y,s,fill,stroke,lineWidth){
+    roundedRect(c,x+1,y+1,s-2,s-2,7);
+    if(fill){ c.fillStyle = fill; c.fill(); }
+    if(stroke){ c.lineWidth = lineWidth || 1; c.strokeStyle = stroke; c.stroke(); }
+  }
+
+  function drawBoard(){
+    const {x,y,size,cell} = layout.board;
+    const level = currentLevel();
+    const dragId = state.drag?.piece.id;
+    const preview = state.hover?.valid ? {piece:state.drag.piece,override:state.hover} : null;
+    const baseCounts = boardCounts(dragId);
+    const counts = boardCounts(dragId,preview);
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.38)';
+    ctx.shadowBlur = 26;
+    ctx.shadowOffsetY = 14;
+    roundedRect(ctx,x-10,y-10,size+20,size+20,12);
+    ctx.fillStyle = '#28231e';
+    ctx.fill();
+    ctx.restore();
+
+    roundedRect(ctx,x,y,size,size,8);
+    ctx.fillStyle = '#1f1d1a';
+    ctx.fill();
+
+    for(let gy=0;gy<level.size;gy++){
+      for(let gx=0;gx<level.size;gx++){
+        const px = x + gx * cell;
+        const py = y + gy * cell;
+        const current = counts[gy][gx] % 2;
+        const target = state.target[gy][gx];
+        const count = counts[gy][gx];
+        drawGridCell(ctx,px,py,cell,'#312d28','rgba(255,244,220,.08)',1);
+        if(target && !current){
+          drawGridCell(ctx,px+4,py+4,cell-8,'rgba(240,182,91,.16)','rgba(240,182,91,.58)',1.5);
+        }
+        if(current && target){
+          drawGridCell(ctx,px+4,py+4,cell-8,'#4fbeaa','rgba(178,255,236,.5)',1.5);
+        }
+        if(current && !target){
+          drawGridCell(ctx,px+4,py+4,cell-8,'#dc6b5d','rgba(255,210,198,.55)',1.5);
+        }
+        if(count > 0 && count % 2 === 0){
+          ctx.fillStyle = 'rgba(168,138,223,.56)';
+          ctx.beginPath();
+          ctx.arc(px + cell/2,py + cell/2,Math.max(4,cell*.12),0,Math.PI*2);
+          ctx.fill();
+        }
+      }
+    }
+
+    if(preview){
+      const before = baseCounts;
+      occupied(state.drag.piece,state.hover).forEach(([gx,gy]) => {
+        if(gx < 0 || gy < 0 || gx >= level.size || gy >= level.size) return;
+        const px = x + gx * cell;
+        const py = y + gy * cell;
+        const willErase = before[gy][gx] % 2 === 1;
+        drawGridCell(
+          ctx,
+          px+2,
+          py+2,
+          cell-4,
+          willErase ? 'rgba(168,138,223,.48)' : 'rgba(123,216,143,.48)',
+          willErase ? '#d4bcff' : '#caffd5',
+          2
+        );
+        if(willErase){
+          ctx.strokeStyle = '#f2dfff';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(px + cell*.25,py + cell*.25);
+          ctx.lineTo(px + cell*.75,py + cell*.75);
+          ctx.moveTo(px + cell*.75,py + cell*.25);
+          ctx.lineTo(px + cell*.25,py + cell*.75);
+          ctx.stroke();
+        }
+      });
+    }
+
+    if(state.hint && performance.now() < state.hint.until){
+      const p = state.pieces.find(piece => piece.id === state.hint.id);
+      if(p){
+        ctx.save();
+        ctx.setLineDash([8,6]);
+        ctx.strokeStyle = '#ffe1a0';
+        ctx.lineWidth = 3;
+        occupied(p,p.solution).forEach(([gx,gy]) => {
+          drawGridCell(ctx,x+gx*cell+3,y+gy*cell+3,cell-6,null,'#ffe1a0',2);
+        });
+        ctx.restore();
+      }
+    }
+
+    ctx.strokeStyle = 'rgba(255,244,220,.24)';
+    ctx.lineWidth = 2;
+    roundedRect(ctx,x,y,size,size,8);
+    ctx.stroke();
+  }
+
+  function drawPieceCells(p,baseX,baseY,cell,alpha,strokeOnly){
+    const cells = pieceCells(p);
+    ctx.save();
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    cells.forEach(([cx,cy]) => {
+      const px = baseX + cx * cell;
+      const py = baseY + cy * cell;
+      drawGridCell(ctx,px,py,cell,strokeOnly ? null : p.color,strokeOnly ? p.color : 'rgba(255,244,220,.38)',1.5);
+    });
+    ctx.restore();
+  }
+
+  function drawPlacedPieceOutlines(){
+    const {x,y,cell} = layout.board;
+    state.pieces.forEach(p => {
+      if(!p.placed || state.drag?.piece.id === p.id) return;
+      drawPieceCells(p,x+p.x*cell,y+p.y*cell,cell,.32,true);
+    });
+  }
+
+  function drawTray(){
+    state.renderPieces = [];
+    const cardW = 112;
+    const cardH = 78;
+    const gap = 10;
+    const startX = layout.tray.x;
+    const startY = layout.tray.y;
+
+    ctx.fillStyle = 'rgba(255,244,220,.58)';
+    ctx.font = '800 13px system-ui, sans-serif';
+    ctx.fillText('基础图形',startX,startY - 12);
+
+    state.pieces.forEach((p,index) => {
+      const col = index % 6;
+      const row = Math.floor(index / 6);
+      const x = startX + col * (cardW + gap);
+      const y = startY + row * (cardH + gap);
+      const active = p.id === state.selectedId;
+      roundedRect(ctx,x,y,cardW,cardH,8);
+      ctx.fillStyle = p.placed ? 'rgba(0,0,0,.18)' : 'rgba(255,244,220,.06)';
+      ctx.fill();
+      ctx.strokeStyle = active ? '#ffe1a0' : 'rgba(255,244,220,.14)';
+      ctx.lineWidth = active ? 2 : 1;
+      ctx.stroke();
+
+      const cells = pieceCells(p);
+      const b = bounds(cells);
+      const thumbCell = Math.min(17,Math.floor(44 / Math.max(b.w,b.h)));
+      const tx = x + 10;
+      const ty = y + 11;
+      ctx.save();
+      ctx.globalAlpha = p.placed ? .48 : 1;
+      drawPieceCells(p,tx,ty,thumbCell,.95,false);
+      ctx.restore();
+      ctx.fillStyle = p.placed ? 'rgba(255,244,220,.45)' : '#f5e5c4';
+      ctx.font = '800 12px system-ui, sans-serif';
+      ctx.fillText(p.name,x+10,y+cardH-12);
+      state.renderPieces.push({id:p.id,kind:'tray',x,y,w:cardW,h:cardH,thumbX:tx,thumbY:ty,thumbCell});
+    });
+
+    const board = layout.board;
+    state.pieces.forEach(p => {
+      if(!p.placed || state.drag?.piece.id === p.id) return;
+      const cells = pieceCells(p);
+      const b = bounds(cells);
+      state.renderPieces.push({
+        id:p.id,
+        kind:'board',
+        x:board.x + p.x * board.cell,
+        y:board.y + p.y * board.cell,
+        w:b.w * board.cell,
+        h:b.h * board.cell
+      });
+    });
+  }
+
+  function drawDrag(){
+    if(!state.drag) return;
+    const p = state.drag.piece;
+    const cells = pieceCells(p);
+    const b = bounds(cells);
+    const cell = state.hover?.valid ? layout.board.cell : 24;
+    const x = state.hover?.valid ? layout.board.x + state.hover.x * layout.board.cell : state.drag.x - state.drag.offsetX;
+    const y = state.hover?.valid ? layout.board.y + state.hover.y * layout.board.cell : state.drag.y - state.drag.offsetY;
+    ctx.save();
+    ctx.globalAlpha = .82;
+    drawPieceCells(p,x,y,cell,.86,false);
+    ctx.strokeStyle = '#fff4dc';
+    ctx.lineWidth = 2;
+    roundedRect(ctx,x,y,b.w*cell,b.h*cell,8);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawParticles(){
+    if(!state.particles.length) return;
+    ctx.save();
+    for(let i=state.particles.length-1;i>=0;i--){
+      const p = state.particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += .035;
+      p.life -= 1;
+      if(p.life <= 0){
+        state.particles.splice(i,1);
+        continue;
+      }
+      ctx.globalAlpha = p.life / p.max;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,3,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+    requestDraw();
+  }
+
+  function draw(){
+    const dpr = canvas.width / W;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    calcLayout();
+    ctx.clearRect(0,0,W,H);
+    const bg = ctx.createLinearGradient(0,0,W,H);
+    bg.addColorStop(0,'#231b17');
+    bg.addColorStop(.6,'#191716');
+    bg.addColorStop(1,'#101614');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0,0,W,H);
+
+    drawBoard();
+    drawPlacedPieceOutlines();
+    drawTray();
+    drawDrag();
+    drawParticles();
+    updateStats();
+  }
+
+  let pendingDraw = false;
+  function requestDraw(){
+    if(pendingDraw) return;
+    pendingDraw = true;
+    requestAnimationFrame(() => {
+      pendingDraw = false;
+      draw();
+    });
+  }
+
+  function resizeCanvas(){
+    const dpr = Math.max(1,Math.min(window.devicePixelRatio || 1,2.5));
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    requestDraw();
+  }
+
+  function drawTarget(){
+    const size = currentLevel().size;
+    const dpr = Math.max(1,Math.min(window.devicePixelRatio || 1,2.5));
+    targetCanvas.width = Math.round(300 * dpr);
+    targetCanvas.height = Math.round(300 * dpr);
+    tctx.setTransform(dpr,0,0,dpr,0,0);
+    tctx.clearRect(0,0,300,300);
+    tctx.fillStyle = '#201d19';
+    roundedRect(tctx,0,0,300,300,8);
+    tctx.fill();
+    const pad = 18;
+    const cell = Math.floor((300 - pad*2) / size);
+    const ox = Math.floor((300 - cell*size) / 2);
+    const oy = ox;
+    for(let y=0;y<size;y++){
+      for(let x=0;x<size;x++){
+        drawGridCell(tctx,ox+x*cell,oy+y*cell,cell,'#312d28','rgba(255,244,220,.08)',1);
+        if(state.target[y][x]){
+          drawGridCell(tctx,ox+x*cell+3,oy+y*cell+3,cell-6,'#f0b65b','rgba(255,226,161,.54)',1.5);
+        }
+      }
+    }
+  }
+
+  function canvasPoint(event){
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x:(event.clientX - rect.left) / rect.width * W,
+      y:(event.clientY - rect.top) / rect.height * H
+    };
+  }
+
+  function hitPiece(pt){
+    for(let i=state.renderPieces.length-1;i>=0;i--){
+      const r = state.renderPieces[i];
+      if(pt.x >= r.x && pt.y >= r.y && pt.x <= r.x + r.w && pt.y <= r.y + r.h){
+        return r;
+      }
+    }
+    return null;
+  }
+
+  function updateHover(){
+    if(!state.drag) return;
+    const p = state.drag.piece;
+    const cells = pieceCells(p);
+    const b = bounds(cells);
+    const topX = state.drag.x - state.drag.offsetX;
+    const topY = state.drag.y - state.drag.offsetY;
+    const gx = Math.round((topX - layout.board.x) / layout.board.cell);
+    const gy = Math.round((topY - layout.board.y) / layout.board.cell);
+    const placement = {x:gx,y:gy,r:p.r,f:p.f};
+    state.hover = {
+      ...placement,
+      valid:gx >= 0 && gy >= 0 && gx + b.w <= currentLevel().size && gy + b.h <= currentLevel().size
+    };
+  }
+
+  function pointerDown(event){
+    const pt = canvasPoint(event);
+    const hit = hitPiece(pt);
+    if(!hit) return;
+    event.preventDefault();
+    const p = state.pieces.find(piece => piece.id === hit.id);
+    if(!p) return;
+    state.selectedId = p.id;
+    state.drag = {
+      piece:p,
+      x:pt.x,
+      y:pt.y,
+      offsetX:pt.x - hit.x,
+      offsetY:pt.y - hit.y,
+      before:snapshot()
+    };
+    if(hit.kind === 'tray' && p.placed){
+      const cells = pieceCells(p);
+      const b = bounds(cells);
+      state.drag.offsetX = Math.min(hit.w*.5,b.w*24*.5);
+      state.drag.offsetY = Math.min(hit.h*.45,b.h*24*.5);
+    }
+    updateSide();
+    updateHover();
+    canvas.setPointerCapture?.(event.pointerId);
+    requestDraw();
+  }
+
+  function pointerMove(event){
+    if(!state.drag) return;
+    const pt = canvasPoint(event);
+    state.drag.x = pt.x;
+    state.drag.y = pt.y;
+    updateHover();
+    requestDraw();
+  }
+
+  function pointerUp(event){
+    if(!state.drag) return;
+    const p = state.drag.piece;
+    const before = state.drag.before;
+    if(state.hover?.valid){
+      p.placed = true;
+      p.x = state.hover.x;
+      p.y = state.hover.y;
+    }else{
+      p.placed = false;
+    }
+    state.drag = null;
+    state.hover = null;
+    canvas.releasePointerCapture?.(event.pointerId);
+    const old = before.find(saved => saved.id === p.id);
+    if(old && !samePlacement(p,old)){
+      pushMove(before);
+      const info = diffInfo();
+      showToast(info.diff === 0 ? '完全一致' : '差异 ' + info.diff);
+      spawnBurst(layout.board.x + (p.x+.5)*layout.board.cell, layout.board.y + (p.y+.5)*layout.board.cell, p.color, 16);
+    }
+    updateSide();
+    requestDraw();
+  }
+
+  function spawnBurst(x,y,color,count){
+    for(let i=0;i<count;i++){
+      const a = Math.random() * Math.PI * 2;
+      const s = 1 + Math.random() * 2.4;
+      state.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-.4,life:28+Math.random()*14,max:42,color});
+    }
+    requestDraw();
+  }
+
+  function rotateSelected(){
+    const p = selectedPiece();
+    if(!p) return;
+    const before = snapshot();
+    p.r = (p.r + 1) % 4;
+    if(p.placed){
+      const b = bounds(pieceCells(p));
+      p.x = Math.max(0,Math.min(currentLevel().size - b.w,p.x));
+      p.y = Math.max(0,Math.min(currentLevel().size - b.h,p.y));
+    }
+    pushMove(before);
+  }
+
+  function flipSelected(){
+    const p = selectedPiece();
+    if(!p) return;
+    const before = snapshot();
+    p.f = !p.f;
+    if(p.placed){
+      const b = bounds(pieceCells(p));
+      p.x = Math.max(0,Math.min(currentLevel().size - b.w,p.x));
+      p.y = Math.max(0,Math.min(currentLevel().size - b.h,p.y));
+    }
+    pushMove(before);
+  }
+
+  function undo(){
+    const last = state.history.pop();
+    if(!last) return;
+    restore(last);
+    state.moves = Math.max(0,state.moves - 1);
+    state.won = false;
+    winModal.classList.remove('show');
+    updateSide();
+    requestDraw();
+  }
+
+  function showHint(){
+    let p = selectedPiece();
+    if(!p || pieceSolved(p)){
+      p = state.pieces.find(piece => !pieceSolved(piece)) || selectedPiece();
+      if(p) state.selectedId = p.id;
+    }
+    if(!p) return;
+    state.hint = {id:p.id,until:performance.now() + 2600};
+    updateSide();
+    showToast(p.name + ' 的目标位置');
+    requestDraw();
+    setTimeout(requestDraw,2700);
+  }
+
+  function reset(){
+    loadLevel(state.levelIndex);
+  }
+
+  function next(){
+    loadLevel(state.levelIndex + 1);
+  }
+
+  function populateLevels(){
+    levelGrid.innerHTML = '';
+    levels.forEach((level,index) => {
+      const button = document.createElement('button');
+      button.className = 'level-btn';
+      button.type = 'button';
+      button.textContent = level.icon;
+      button.title = level.name;
+      button.addEventListener('click',() => loadLevel(index));
+      levelGrid.appendChild(button);
+    });
+  }
+
+  canvas.addEventListener('pointerdown',pointerDown);
+  canvas.addEventListener('pointermove',pointerMove);
+  canvas.addEventListener('pointerup',pointerUp);
+  canvas.addEventListener('pointercancel',pointerUp);
+  window.addEventListener('resize',resizeCanvas);
+
+  document.getElementById('rotBtn').addEventListener('click',rotateSelected);
+  document.getElementById('flipBtn').addEventListener('click',flipSelected);
+  document.getElementById('undoBtn').addEventListener('click',undo);
+  document.getElementById('hintBtn').addEventListener('click',showHint);
+  document.getElementById('resetBtn').addEventListener('click',reset);
+  document.getElementById('nextBtn').addEventListener('click',next);
+  document.getElementById('againBtn').addEventListener('click',reset);
+  document.getElementById('modalNextBtn').addEventListener('click',next);
+  winModal.addEventListener('click',event => {
+    if(event.target === winModal) winModal.classList.remove('show');
+  });
+
+  setInterval(() => {
+    updateStats();
+  },250);
+
+  populateLevels();
+  loadLevel(0);
+  resizeCanvas();
+})();
+</script>
+<script id="touchGuardScript">
+(function(){
+  const allowText = 'input, textarea, [contenteditable="true"]';
+  const isAllowed = target => {
+    const el = target && target.nodeType === 1 ? target : target && target.parentElement;
+    return !!(el && el.closest && el.closest(allowText));
+  };
+  ['selectstart','dragstart','contextmenu'].forEach(type => {
+    document.addEventListener(type, event => {
+      if(!isAllowed(event.target)) event.preventDefault();
+    }, {passive:false});
+  });
+})();
+</script>
+<script id="hubReturnScript">
+(function(){
+  if(document.getElementById('hubReturnBtn')) return;
+  function hubHref(){
+    const url = new URL(location.href);
+    const parts = url.pathname.split('/');
+    const decoded = parts.map(part => {
+      try{return decodeURIComponent(part);}catch(e){return part;}
+    });
+    const markers = ['G-Game-发布版','g-game-hub','写程序'];
+    let pivot = -1;
+    markers.forEach(marker => {
+      const idx = decoded.lastIndexOf(marker);
+      if(idx > pivot) pivot = idx;
+    });
+    if(pivot >= 0){
+      url.pathname = parts.slice(0, pivot + 1).join('/') + '/G-Game/index.html';
+      url.search = '?v=return-hub';
+      url.hash = '';
+      return url.href;
+    }
+    return new URL('../G-Game/index.html?v=return-hub', location.href).href;
+  }
+  function mount(){
+    if(!document.body) return;
+    const link = document.createElement('a');
+    link.id = 'hubReturnBtn';
+    link.href = hubHref();
+    link.target = '_top';
+    link.textContent = '返回大厅';
+    link.setAttribute('aria-label', '返回大厅');
+    document.body.appendChild(link);
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, {once:true});
+  else mount();
+})();
+</script>
+</body>
+</html>

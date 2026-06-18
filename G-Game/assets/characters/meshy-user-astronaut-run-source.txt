@@ -1,0 +1,5 @@
+Source: /Users/g/Downloads/Meshy_AI_Generate_a_full_body__biped (1).zip
+Processed: 2026-06-19
+Contents used: Character_output as idle, Animation_Running_withSkin as running.
+Optimization: kept 2048 texture, converted PNG to high-quality JPEG, appended only running animation data.
+Output: meshy-user-astronaut-run.glb

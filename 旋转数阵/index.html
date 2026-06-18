@@ -624,6 +624,14 @@
       transform: translateX(-50%) translateY(-4px);
     }
 
+    @media (max-width: 640px) {
+      .toast {
+        bottom: calc(env(safe-area-inset-bottom) + 82px);
+        max-width: calc(100vw - 32px);
+        text-align: center;
+      }
+    }
+
     #welcome-mask {
       position: fixed;
       inset: 0;
@@ -964,7 +972,7 @@
     transition:transform .12s ease, border-color .16s ease, background .16s ease;
   }
   #hubReturnBtn:active{transform:scale(.96);border-color:rgba(46,230,214,.78);background:rgba(18,34,58,.82)}
-  @media (max-width:640px){#hubReturnBtn{height:30px;min-width:66px;padding:0 9px;font-size:12px}}
+  @media (max-width:640px){#hubReturnBtn{top:calc(env(safe-area-inset-top) + 52px);height:30px;min-width:66px;padding:0 9px;font-size:12px}}
 </style>
 </head>
 <body>
@@ -1024,7 +1032,7 @@
         <button id="undoBtn" type="button">撤销</button>
         <button id="hintBtn" type="button">提示</button>
         <button id="autoBtn" type="button">演示</button>
-        <button id="soundBtn" type="button">音效</button>
+        <button id="soundBtn" type="button">音乐</button>
       </div>
       <div class="hint-line" id="hintLine">提示会根据当前棋盘寻找下一步，卡住时可以点一下。</div>
     </section>
@@ -1073,6 +1081,7 @@
     const welcomeMask = document.getElementById("welcome-mask");
     const welcomeStart = document.getElementById("welcome-start");
 
+    const BGM_URL = "https://cdn1.suno.ai/55609391-8898-4ad5-a602-6934f169d28d.mp3";
     const LEVEL_STEP = 5;
     const gridPoints = [
       [3, 0], [2, 1], [4, 1],
@@ -1113,6 +1122,9 @@
     let timerId = null;
     let busy = false;
     let soundOn = true;
+    let audioContext = null;
+    let bgmAudio = null;
+    let bgmStarted = false;
     let autoPlaying = false;
     let toastId = null;
 
@@ -1288,22 +1300,127 @@
       }
     }
 
+    function getAudioContext() {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return null;
+      if (!audioContext) {
+        audioContext = new AudioContext();
+      }
+      if (audioContext.state === "suspended") {
+        audioContext.resume();
+      }
+      return audioContext;
+    }
+
+    function startBgm() {
+      if (!soundOn) return;
+      if (!bgmAudio) {
+        bgmAudio = new Audio(BGM_URL);
+        bgmAudio.loop = true;
+        bgmAudio.preload = "auto";
+        bgmAudio.volume = .24;
+      }
+      syncAudioState();
+      bgmAudio.play().then(() => {
+        bgmStarted = true;
+        syncAudioState();
+      }).catch(() => {
+        bgmStarted = false;
+        syncAudioState();
+        showToast("再点一下“音乐”开启背景音乐。");
+      });
+    }
+
+    function stopBgm() {
+      if (bgmAudio) {
+        bgmAudio.pause();
+      }
+      bgmStarted = false;
+      syncAudioState();
+    }
+
+    function setSoundButton() {
+      const button = document.getElementById("soundBtn");
+      button.textContent = soundOn ? "音乐" : "静音";
+      syncAudioState();
+    }
+
+    function syncAudioState() {
+      document.body.dataset.soundOn = soundOn ? "1" : "0";
+      document.body.dataset.bgmStarted = bgmStarted ? "1" : "0";
+      document.body.dataset.bgmPaused = bgmAudio && !bgmAudio.paused ? "0" : "1";
+      document.body.dataset.bgmReadyState = bgmAudio ? String(bgmAudio.readyState) : "0";
+      document.body.dataset.bgmSrc = bgmAudio ? (bgmAudio.currentSrc || bgmAudio.src) : "";
+      document.body.dataset.bgmElement = bgmAudio ? "1" : "0";
+      document.body.dataset.audioContextState = audioContext ? audioContext.state : "";
+    }
+
+    function readAudioState() {
+      return {
+        soundOn,
+        bgmStarted,
+        bgmSrc: bgmAudio ? (bgmAudio.currentSrc || bgmAudio.src) : "",
+        bgmPaused: bgmAudio ? bgmAudio.paused : true,
+        bgmReadyState: bgmAudio ? bgmAudio.readyState : 0,
+        bgmCurrentTime: bgmAudio ? Number(bgmAudio.currentTime.toFixed(2)) : 0,
+        bgmVolume: bgmAudio ? bgmAudio.volume : 0,
+        audioContextState: audioContext ? audioContext.state : ""
+      };
+    }
+
+    window.__rotationArrayAudioState = readAudioState;
+
     function playTone(type = "move") {
       if (!soundOn) return;
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) return;
-      const context = new AudioContext();
+      const context = getAudioContext();
+      if (!context) return;
+      if (type === "win") {
+        playCuteNotes([523.25, 659.25, 783.99, 1046.5], .12, .08);
+        return;
+      }
+      playBubblePop();
+      playCuteNotes([620 + Math.random() * 40, 820 + Math.random() * 60], .07, .035);
+      window.setTimeout(() => playCuteNotes([1040 + Math.random() * 80], .055, .025), 55);
+    }
+
+    function playCuteNotes(frequencies, duration, volume) {
+      const context = getAudioContext();
+      if (!context) return;
+      const baseTime = context.currentTime;
+      frequencies.forEach((frequency, index) => {
+        const start = baseTime + index * duration * .72;
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = index % 2 ? "triangle" : "sine";
+        oscillator.frequency.setValueAtTime(frequency, start);
+        oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.08, start + duration * .6);
+        gain.gain.setValueAtTime(.001, start);
+        gain.gain.exponentialRampToValueAtTime(volume, start + .01);
+        gain.gain.exponentialRampToValueAtTime(.001, start + duration);
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(start);
+        oscillator.stop(start + duration + .02);
+      });
+    }
+
+    function playBubblePop() {
+      if (!soundOn) return;
+      const context = getAudioContext();
+      if (!context) return;
+      const now = context.currentTime;
       const oscillator = context.createOscillator();
       const gain = context.createGain();
-      oscillator.type = type === "win" ? "triangle" : "sine";
-      oscillator.frequency.value = type === "win" ? 720 : 260 + Math.random() * 90;
-      gain.gain.setValueAtTime(.001, context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(type === "win" ? .08 : .035, context.currentTime + .015);
-      gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + (type === "win" ? .28 : .11));
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(360, now);
+      oscillator.frequency.exponentialRampToValueAtTime(760, now + .08);
+      gain.gain.setValueAtTime(.001, now);
+      gain.gain.exponentialRampToValueAtTime(.018, now + .012);
+      gain.gain.exponentialRampToValueAtTime(.001, now + .09);
       oscillator.connect(gain);
       gain.connect(context.destination);
-      oscillator.start();
-      oscillator.stop(context.currentTime + (type === "win" ? .3 : .13));
+      oscillator.start(now);
+      oscillator.stop(now + .1);
     }
 
     function renderStaticBoard() {
@@ -1616,11 +1733,25 @@
       flashPad(move);
     });
     document.getElementById("autoBtn").addEventListener("click", () => autoPlay());
-    document.getElementById("soundBtn").addEventListener("click", (event) => {
+    document.getElementById("soundBtn").addEventListener("click", () => {
+      if (soundOn && (!bgmAudio || bgmAudio.paused)) {
+        startBgm();
+        playBubblePop();
+        return;
+      }
       soundOn = !soundOn;
-      event.currentTarget.textContent = soundOn ? "音效" : "静音";
+      if (soundOn) {
+        setSoundButton();
+        startBgm();
+        playBubblePop();
+      } else {
+        stopBgm();
+        setSoundButton();
+      }
     });
     welcomeStart.addEventListener("click", () => {
+      getAudioContext();
+      startBgm();
       welcomeMask.classList.add("hide");
       window.setTimeout(() => {
         welcomeMask.style.display = "none";
@@ -1640,6 +1771,7 @@
     });
 
     renderStaticBoard();
+    setSoundButton();
     resetGame();
   </script>
 <script id="touchGuardScript">

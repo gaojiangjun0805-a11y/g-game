@@ -1,0 +1,4 @@
+Source: Meshy AI, generated in gaojiangjun0805 workspace on 2026-06-19.
+Prompt summary: male astronaut, young adult, game-ready, front-facing A-pose, no hand in pockets, sci-fi suit.
+Meshy processing: retopology to about 9.3k faces, biped rig, Running and Walking animations.
+Local output: merged idle/walking/running GLB for G-Game lobby.

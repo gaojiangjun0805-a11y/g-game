@@ -1,0 +1,5 @@
+Source: /Users/g/Downloads/Meshy_AI_biped.zip
+Processed: 2026-06-19
+Contents used: Animation_Walking_withSkin as walking base, Animation_Running_withSkin as running.
+Optimization: resized 4096 texture to 2048, flattened opaque PNG to high-quality JPEG, appended only running animation data.
+Output: meshy-robot-run.glb
