@@ -619,7 +619,7 @@ let avatarModelLoadToken = 0;
 let avatarModelReady = Promise.resolve(false);
 let avatarModelReadyResolver = null;
 let avatarModelStatus = 'idle';
-const MIN_HUB_LOADING_MS = 760;
+const MAX_HUB_LOADING_MS = 650;
 
 buildWorld();
 const avatar = buildAvatar();
@@ -2730,6 +2730,13 @@ function wait(ms){
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function waitForAvatarModelReady(timeoutMs=MAX_HUB_LOADING_MS){
+  return Promise.race([
+    avatarModelReady.catch(() => false),
+    wait(timeoutMs).then(() => avatarModelStatus === 'ready')
+  ]);
+}
+
 function setBootLoading(on, title='正在加载大厅', text='正在读取真实角色模型和大厅资源，完成后直接进入。'){
   const card = document.querySelector('#bootCover .bootCard');
   if(card) card.classList.toggle('loading', Boolean(on));
@@ -3366,23 +3373,14 @@ function setupUi(){
 async function enterHub(options={}){
   hubEntered = true;
   const title = options.title || `正在加载${getAvatarPresetLabel()}模型`;
-  const text = options.text || '正在读取真实角色模型和大厅资源，完成后直接进入。';
+  const text = options.text || '正在读取真实角色模型，马上进入大厅。';
   setBootLoading(true, title, text);
   avatar.group.visible = false;
   const cover = document.getElementById('bootCover');
   if(cover) cover.classList.remove('hide');
   startHubAudio(true);
-  const started = performance.now();
-  const ready = await avatarModelReady.catch(() => false);
-  const remain = Math.max(0, MIN_HUB_LOADING_MS - (performance.now() - started));
-  if(remain) await wait(remain);
-  if(!ready){
-    hubEntered = false;
-    setBootLoading(false);
-    toast('人物模型加载失败，请检查网络后重试');
-    return false;
-  }
-  avatar.group.visible = true;
+  const ready = await waitForAvatarModelReady();
+  avatar.group.visible = Boolean(ready || avatar.realModelRoot?.visible);
   setBootLoading(false);
   if(cover) cover.classList.add('hide');
   return true;
@@ -3961,7 +3959,7 @@ async function handleHubReturnState(){
   if(gameId) placeAvatarAtPortal(gameId);
   await enterHub({
     title:'正在返回大厅',
-    text:'正在恢复角色模型和上次所在的游戏入口。'
+    text:'正在恢复上次所在的游戏入口。'
   });
 }
 function closeGame(){
