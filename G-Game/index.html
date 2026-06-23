@@ -1040,6 +1040,79 @@ function makeTextSprite(text, options={}){
   sprite.scale.set(width / height * scale, scale, 1);
   return sprite;
 }
+function makeAdSlotSprite(accent='#9fd8ff'){
+  const width = 980;
+  const height = 260;
+  const c = document.createElement('canvas');
+  c.width = width;
+  c.height = height;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,width,height);
+
+  const bg = ctx.createLinearGradient(0,0,width,height);
+  bg.addColorStop(0,'rgba(4,9,18,.92)');
+  bg.addColorStop(.55,'rgba(18,24,36,.88)');
+  bg.addColorStop(1,'rgba(4,9,18,.94)');
+  roundedRect(ctx, 18, 20, width-36, height-40, 34);
+  ctx.fillStyle = bg;
+  ctx.fill();
+
+  ctx.save();
+  ctx.clip();
+  ctx.globalAlpha = .14;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1;
+  for(let x=32;x<width-32;x+=38){
+    ctx.beginPath();
+    ctx.moveTo(x,28);
+    ctx.lineTo(x,height-28);
+    ctx.stroke();
+  }
+  for(let y=38;y<height-30;y+=30){
+    ctx.beginPath();
+    ctx.moveTo(24,y);
+    ctx.lineTo(width-24,y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const shine = ctx.createLinearGradient(0,22,width,22);
+  shine.addColorStop(0,'rgba(255,255,255,0)');
+  shine.addColorStop(.5,'rgba(255,255,255,.16)');
+  shine.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = shine;
+  ctx.fillRect(28,32,width-56,28);
+
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = accent;
+  ctx.stroke();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(255,255,255,.42)';
+  roundedRect(ctx, 34, 36, width-68, height-72, 26);
+  ctx.stroke();
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,.85)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 4;
+  ctx.fillStyle = 'rgba(255,255,255,.72)';
+  ctx.font = '800 34px PingFang SC, Microsoft YaHei, sans-serif';
+  ctx.fillText('G-GAME AD SLOT', width/2, 78);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 86px PingFang SC, Microsoft YaHei, sans-serif';
+  ctx.fillText('广告位待入驻', width/2, 152);
+  ctx.fillStyle = accent;
+  ctx.font = '800 30px PingFang SC, Microsoft YaHei, sans-serif';
+  ctx.fillText('合作展示 / 品牌露出', width/2, 214);
+
+  const texture = setTextureColorSpace(new THREE.CanvasTexture(c));
+  texture.anisotropy = 4;
+  const material = new THREE.SpriteMaterial({map:texture, transparent:true, depthWrite:false});
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(7.2, 1.85, 1);
+  return sprite;
+}
 function addTube(group, from, to, radius, mat){
   const start = new THREE.Vector3(from[0], from[1], from[2]);
   const end = new THREE.Vector3(to[0], to[1], to[2]);
@@ -1779,6 +1852,10 @@ function buildWorld(){
     const label = makeTextSprite(ability.name, {accent:ability.color, scale:1.28, fontSize:102, width:760, height:220, bg:'rgba(3,6,12,.9)'});
     label.position.set(0,4.95,2.55);
     group.add(label);
+
+    const adSlot = makeAdSlotSprite(ability.color);
+    adSlot.position.set(0,3.42,2.62);
+    group.add(adSlot);
   });
 
   GAMES.forEach((game, idx)=>{
