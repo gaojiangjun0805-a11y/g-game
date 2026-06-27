@@ -201,46 +201,52 @@ button.cube:active{transform:scale(1.11);filter:brightness(1.16)}
   left:0;
   top:0;
   z-index:35;
-  width:42px;
-  height:54px;
+  width:24px;
+  height:32px;
   pointer-events:none;
   opacity:0;
-  transform:translate(-50%,-86%);
+  transform:translate(-50%,-132%);
+  mix-blend-mode:screen;
 }
 #tutorial-hand.show{
   opacity:1;
-  animation:handPress 1.15s ease-in-out infinite;
+  animation:handBlink 1.05s ease-in-out infinite;
 }
 #tutorial-hand::before{
   content:"";
   position:absolute;
-  left:17px;
+  left:10px;
   top:0;
-  width:9px;
-  height:31px;
+  width:5px;
+  height:19px;
   border-radius:999px;
-  background:#f8fbff;
-  border:1px solid rgba(12,18,34,.26);
-  box-shadow:0 5px 12px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.7);
+  background:rgba(248,251,255,.3);
+  border:1px solid rgba(255,255,255,.5);
+  box-shadow:0 0 12px rgba(157,240,214,.46),inset 0 1px 0 rgba(255,255,255,.34);
 }
 #tutorial-hand::after{
   content:"";
   position:absolute;
-  left:9px;
-  top:23px;
-  width:26px;
-  height:20px;
+  left:5px;
+  top:15px;
+  width:16px;
+  height:12px;
   border-radius:13px 13px 10px 10px;
-  background:#f8fbff;
-  border:1px solid rgba(12,18,34,.24);
-  box-shadow:0 7px 14px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.74);
+  background:rgba(248,251,255,.22);
+  border:1px solid rgba(255,255,255,.45);
+  box-shadow:0 0 14px rgba(157,240,214,.36),inset 0 1px 0 rgba(255,255,255,.28);
 }
 .cube.tutorial-target{
-  box-shadow:0 0 0 3px var(--gold),0 0 28px rgba(255,211,106,.48),inset 0 1px 0 rgba(255,255,255,.18);
+  box-shadow:0 0 0 2px rgba(255,211,106,.78),0 0 18px rgba(255,211,106,.32),inset 0 1px 0 rgba(255,255,255,.18);
+  animation:targetPulse .95s ease-in-out infinite;
 }
-@keyframes handPress{
-  0%,100%{transform:translate(-50%,-86%) scale(1)}
-  48%{transform:translate(-50%,-63%) scale(.96)}
+@keyframes handBlink{
+  0%,100%{opacity:.08;transform:translate(-50%,-138%) scale(.96)}
+  48%{opacity:.58;transform:translate(-50%,-112%) scale(1)}
+}
+@keyframes targetPulse{
+  0%,100%{filter:brightness(1)}
+  48%{filter:brightness(1.22)}
 }
 #buttons{
   width:100%;
@@ -480,7 +486,7 @@ body[data-orientation="portrait"] #boot-start{background:linear-gradient(135deg,
   <section id="level-card">
     <div id="level-top">
       <span id="level-kicker">第 1 / 18 关</span>
-      <span id="level-size">5x5 · 1 处</span>
+      <span id="level-size">2x2 · 1 处</span>
     </div>
     <div id="level-name">第 1 关：新手找一处</div>
     <div id="level-note">教学关：右侧只有 1 处不同，跟着手指点。</div>
@@ -526,8 +532,8 @@ body[data-orientation="portrait"] #boot-start{background:linear-gradient(135deg,
 </div>
 <script>
 const LEVELS=[
-  {name:'第 1 关：新手找一处',n:5,diffs:1,time:70,mutations:1,note:'教学关：右侧只有 1 处不同，跟着手指点。',tutorial:true,guide:'看右侧手指按压的位置，点那一格。'},
-  {name:'第 2 关：新手找两处',n:6,diffs:2,time:85,mutations:1,note:'教学关：先对齐左右同位置，再找右侧 2 处不同。',tutorial:true,guide:'手指会依次提示未找到的差异格。'},
+  {name:'第 1 关：新手找一处',n:2,diffs:1,time:45,mutations:1,note:'教学关：2x2 小墙，右侧只有 1 处不同。',tutorial:true,guide:'看右侧半透明手指闪烁的位置，点那一格。'},
+  {name:'第 2 关：新手找两处',n:3,diffs:2,time:60,mutations:1,note:'教学关：3x3 小墙，右侧有 2 处不同。',tutorial:true,guide:'手指会闪烁提示未找到的差异格。'},
   {name:'第 3 关：八阶入口',n:8,diffs:4,time:95,mutations:1,note:'8x8 正式开始，右侧藏着 4 处不同。'},
   {name:'第 4 关：八阶密纹',n:8,diffs:5,time:98,mutations:1,note:'8x8 密纹墙，5 处不同。'},
   {name:'第 5 关：九阶入口',n:9,diffs:5,time:105,mutations:1,note:'9x9 魔方墙，5 处不同。'},
@@ -558,10 +564,10 @@ const tutorialHand=document.getElementById('tutorial-hand');
 const bg=document.getElementById('bg');
 const bgCtx=bg.getContext('2d');
 let levelIndex=0,level=LEVELS[0],left=[],right=[],diffs=new Set(),found=new Set();
-let misses=0,timeLeft=0,timer=null,tutorialTimer=null,ended=false,revealed=false,soundOn=true,audioCtx=null,masterGain=null,sfxGain=null,musicGain=null,musicTimer=null,musicStep=0,floaters=[],gameStarted=false,bgmAudio=null;
-const BGM_URL="audio/magic-wall-loop.m4a";
-const BGM_VOLUME=.24;
-const SFX_VOLUME=.84;
+let misses=0,timeLeft=0,timer=null,tutorialTimer=null,ended=false,revealed=false,soundOn=true,audioCtx=null,masterGain=null,sfxGain=null,floaters=[],gameStarted=false,bgmAudio=null;
+const BGM_URL="audio/magic-wall-suno.mp3";
+const BGM_VOLUME=.22;
+const SFX_VOLUME=.82;
 
 function rng(seed){
   let t=seed>>>0;
@@ -624,13 +630,10 @@ function ensureAudio(){
     audioCtx=new(window.AudioContext||window.webkitAudioContext)();
     masterGain=audioCtx.createGain();
     sfxGain=audioCtx.createGain();
-    musicGain=audioCtx.createGain();
     const comp=audioCtx.createDynamicsCompressor();
     masterGain.gain.value=.86;
     sfxGain.gain.value=SFX_VOLUME;
-    musicGain.gain.value=BGM_VOLUME;
     sfxGain.connect(masterGain);
-    musicGain.connect(masterGain);
     masterGain.connect(comp);
     comp.connect(audioCtx.destination);
   }
@@ -646,16 +649,6 @@ function tone(freq,dur,vol,type,delay){
   g.gain.exponentialRampToValueAtTime(vol||.05,t+.012);
   g.gain.exponentialRampToValueAtTime(.0001,t+dur);
   o.connect(g);g.connect(sfxGain||ac.destination);o.start(t);o.stop(t+dur+.02);
-}
-function musicTone(freq,dur,vol,type,delay){
-  const ac=ensureAudio(); if(!ac)return;
-  const t=ac.currentTime+(delay||0);
-  const o=ac.createOscillator(),g=ac.createGain();
-  o.type=type||'sine'; o.frequency.setValueAtTime(freq,t);
-  g.gain.setValueAtTime(.0001,t);
-  g.gain.exponentialRampToValueAtTime(vol||.045,t+.02);
-  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
-  o.connect(g);g.connect(musicGain||ac.destination);o.start(t);o.stop(t+dur+.04);
 }
 function ensureBgm(){
   if(!bgmAudio){
@@ -675,8 +668,6 @@ function startMusic(){
   if(play&&play.catch)play.catch(()=>{});
 }
 function stopMusic(){
-  if(musicTimer)clearInterval(musicTimer);
-  musicTimer=null;
   if(bgmAudio)bgmAudio.pause();
 }
 function sfx(kind){
