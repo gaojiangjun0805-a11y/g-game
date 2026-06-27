@@ -196,6 +196,52 @@ button.cube:active{transform:scale(1.11);filter:brightness(1.16)}
   line-height:1.35;
   text-shadow:0 0 14px rgba(255,211,106,.26);
 }
+#tutorial-hand{
+  position:fixed;
+  left:0;
+  top:0;
+  z-index:35;
+  width:42px;
+  height:54px;
+  pointer-events:none;
+  opacity:0;
+  transform:translate(-50%,-86%);
+}
+#tutorial-hand.show{
+  opacity:1;
+  animation:handPress 1.15s ease-in-out infinite;
+}
+#tutorial-hand::before{
+  content:"";
+  position:absolute;
+  left:17px;
+  top:0;
+  width:9px;
+  height:31px;
+  border-radius:999px;
+  background:#f8fbff;
+  border:1px solid rgba(12,18,34,.26);
+  box-shadow:0 5px 12px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.7);
+}
+#tutorial-hand::after{
+  content:"";
+  position:absolute;
+  left:9px;
+  top:23px;
+  width:26px;
+  height:20px;
+  border-radius:13px 13px 10px 10px;
+  background:#f8fbff;
+  border:1px solid rgba(12,18,34,.24);
+  box-shadow:0 7px 14px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.74);
+}
+.cube.tutorial-target{
+  box-shadow:0 0 0 3px var(--gold),0 0 28px rgba(255,211,106,.48),inset 0 1px 0 rgba(255,255,255,.18);
+}
+@keyframes handPress{
+  0%,100%{transform:translate(-50%,-86%) scale(1)}
+  48%{transform:translate(-50%,-63%) scale(.96)}
+}
 #buttons{
   width:100%;
   max-width:none;
@@ -412,6 +458,7 @@ body[data-orientation="portrait"] #boot-start{background:linear-gradient(135deg,
 </head>
 <body>
 <canvas id="bg"></canvas>
+<div id="tutorial-hand" aria-hidden="true"></div>
 <div id="boot" role="dialog" aria-modal="true" aria-labelledby="boot-title">
   <div class="boot-card">
     <div class="boot-logo">G-Game</div>
@@ -433,15 +480,15 @@ body[data-orientation="portrait"] #boot-start{background:linear-gradient(135deg,
   <section id="level-card">
     <div id="level-top">
       <span id="level-kicker">第 1 / 18 关</span>
-      <span id="level-size">8x8 · 4 处</span>
+      <span id="level-size">5x5 · 1 处</span>
     </div>
-    <div id="level-name">第 1 关：八阶魔方墙</div>
-    <div id="level-note">8x8 起步，右侧藏着 4 处不同。</div>
+    <div id="level-name">第 1 关：新手找一处</div>
+    <div id="level-note">教学关：右侧只有 1 处不同，跟着手指点。</div>
     <div id="rail"></div>
   </section>
   <div id="hud">
     <span>找到 <b id="found">0</b></span>
-    <span>剩余 <b id="left">4</b></span>
+    <span>剩余 <b id="left">1</b></span>
     <span>失误 <b id="misses">0</b></span>
     <span>时间 <b id="timer">0</b>s</span>
   </div>
@@ -459,7 +506,7 @@ body[data-orientation="portrait"] #boot-start{background:linear-gradient(135deg,
     <button class="btn" id="btn-reveal">显示答案</button>
     <button class="btn" id="btn-sound">声音开</button>
   </div>
-  <div id="guide">8x8 · 4 处不同</div>
+  <div id="guide">教学：看右侧手指指向的格子</div>
 </main>
 <div id="settle">
   <div class="modal">
@@ -479,10 +526,10 @@ body[data-orientation="portrait"] #boot-start{background:linear-gradient(135deg,
 </div>
 <script>
 const LEVELS=[
-  {name:'第 1 关：八阶魔方墙',n:8,diffs:4,time:90,mutations:1,note:'8x8 起步，右侧藏着 4 处不同。'},
-  {name:'第 2 关：八阶密纹',n:8,diffs:5,time:92,mutations:1,note:'8x8 密纹墙，5 处不同。'},
-  {name:'第 3 关：八阶交错',n:8,diffs:6,time:95,mutations:1,note:'8x8 交错墙，6 处不同。'},
-  {name:'第 4 关：八阶裂面',n:8,diffs:7,time:98,mutations:2,note:'8x8 裂面墙，7 处不同。'},
+  {name:'第 1 关：新手找一处',n:5,diffs:1,time:70,mutations:1,note:'教学关：右侧只有 1 处不同，跟着手指点。',tutorial:true,guide:'看右侧手指按压的位置，点那一格。'},
+  {name:'第 2 关：新手找两处',n:6,diffs:2,time:85,mutations:1,note:'教学关：先对齐左右同位置，再找右侧 2 处不同。',tutorial:true,guide:'手指会依次提示未找到的差异格。'},
+  {name:'第 3 关：八阶入口',n:8,diffs:4,time:95,mutations:1,note:'8x8 正式开始，右侧藏着 4 处不同。'},
+  {name:'第 4 关：八阶密纹',n:8,diffs:5,time:98,mutations:1,note:'8x8 密纹墙，5 处不同。'},
   {name:'第 5 关：九阶入口',n:9,diffs:5,time:105,mutations:1,note:'9x9 魔方墙，5 处不同。'},
   {name:'第 6 关：九阶色墙',n:9,diffs:6,time:108,mutations:1,note:'9x9 色墙，6 处不同。'},
   {name:'第 7 关：九阶错层',n:9,diffs:7,time:112,mutations:2,note:'9x9 错层墙，7 处不同。'},
@@ -507,10 +554,11 @@ const arenaEl=document.getElementById('arena');
 const bootEl=document.getElementById('boot');
 const bootStartEl=document.getElementById('boot-start');
 const bootHintEl=document.getElementById('boot-hint');
+const tutorialHand=document.getElementById('tutorial-hand');
 const bg=document.getElementById('bg');
 const bgCtx=bg.getContext('2d');
 let levelIndex=0,level=LEVELS[0],left=[],right=[],diffs=new Set(),found=new Set();
-let misses=0,timeLeft=0,timer=null,ended=false,revealed=false,soundOn=true,audioCtx=null,masterGain=null,sfxGain=null,musicGain=null,musicTimer=null,musicStep=0,floaters=[],gameStarted=false,bgmAudio=null;
+let misses=0,timeLeft=0,timer=null,tutorialTimer=null,ended=false,revealed=false,soundOn=true,audioCtx=null,masterGain=null,sfxGain=null,musicGain=null,musicTimer=null,musicStep=0,floaters=[],gameStarted=false,bgmAudio=null;
 const BGM_URL="audio/magic-wall-loop.m4a";
 const BGM_VOLUME=.24;
 const SFX_VOLUME=.84;
@@ -746,6 +794,7 @@ function render(){
   renderWall(leftWall,left,false);
   renderWall(rightWall,right,true);
   updateHud();
+  scheduleTutorialHint();
 }
 function updateHud(){
   document.getElementById('found').textContent=found.size;
@@ -770,6 +819,36 @@ function renderRail(){
 function guide(text,ms){
   guideEl.textContent=text||'';
   if(ms)setTimeout(()=>{if(guideEl.textContent===text)guideEl.textContent='';},ms);
+}
+function clearTutorialHint(){
+  if(tutorialTimer)clearTimeout(tutorialTimer);
+  tutorialTimer=null;
+  tutorialHand.classList.remove('show');
+  rightWall.querySelectorAll('.tutorial-target').forEach(node=>node.classList.remove('tutorial-target'));
+}
+function getTutorialTarget(){
+  if(!level.tutorial||revealed||ended)return null;
+  for(const idx of diffs){
+    if(!found.has(idx))return idx;
+  }
+  return null;
+}
+function showTutorialHint(){
+  clearTutorialHint();
+  const idx=getTutorialTarget();
+  if(idx===null)return;
+  const target=rightWall.querySelector('[data-i="'+idx+'"]');
+  if(!target)return;
+  target.classList.add('tutorial-target');
+  const rect=target.getBoundingClientRect();
+  tutorialHand.style.left=(rect.left+rect.width/2)+'px';
+  tutorialHand.style.top=(rect.top+rect.height/2)+'px';
+  tutorialHand.classList.add('show');
+}
+function scheduleTutorialHint(){
+  clearTutorialHint();
+  if(!level.tutorial||!gameStarted||revealed||ended)return;
+  tutorialTimer=setTimeout(showTutorialHint,180);
 }
 function isLandscapeView(){
   return window.innerWidth >= window.innerHeight;
@@ -800,6 +879,7 @@ function onRightClick(e){
     tile.classList.add('found');
     sfx('good');
     guide('命中，还剩 '+Math.max(0,diffs.size-found.size)+' 处。',650);
+    scheduleTutorialHint();
     if(found.size===diffs.size)setTimeout(()=>showSettle(true),380);
   }else{
     misses++;
@@ -812,6 +892,7 @@ function onRightClick(e){
 }
 function startLevel(index){
   clearInterval(timer);
+  clearTutorialHint();
   levelIndex=Math.max(0,Math.min(LEVELS.length-1,index));
   level=LEVELS[levelIndex];
   timeLeft=level.time;
@@ -819,7 +900,7 @@ function startLevel(index){
   document.getElementById('settle').classList.remove('show');
   generateLevel();
   render();
-  guide(level.n+'x'+level.n+' · '+level.diffs+' 处不同',1100);
+  guide(level.guide||level.n+'x'+level.n+' · '+level.diffs+' 处不同',1400);
   timer=setInterval(()=>{
     timeLeft--;
     document.getElementById('timer').classList.toggle('low',timeLeft<=12);
@@ -831,6 +912,7 @@ function showSettle(cleared){
   if(ended)return;
   ended=true;
   clearInterval(timer);
+  clearTutorialHint();
   const base=cleared?1000+levelIndex*90:0;
   const acc=Math.max(0,1-misses/Math.max(1,diffs.size+misses));
   const focus=cleared?Math.round(base*acc):0;
@@ -880,6 +962,7 @@ document.getElementById('btn-new').addEventListener('click',()=>startLevel(level
 document.getElementById('btn-reveal').addEventListener('click',()=>{
   if(ended)return;
   revealed=!revealed;
+  clearTutorialHint();
   if(revealed){misses+=2;guide('已显示未找到答案，本关会扣准确分。',1000);}
   render();
 });
